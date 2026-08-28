@@ -138,11 +138,50 @@ function genererCode(nom){
 function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
 
+const NOMS_MOIS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+function moisActuelKey(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; }
+function formatMoisLabel(key){
+  const [y,m]=key.split("-").map(Number);
+  return `${NOMS_MOIS[m-1]} ${y}`;
+}
+function decalerMois(key,delta){
+  const [y,m]=key.split("-").map(Number);
+  const d=new Date(y, m-1+delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+}
+function moisVide(){ return { salaire:"", depenses:[] }; }
+
+const FORMULES = {
+  "1": { label:"1 mois", mois:1 },
+  "3": { label:"3 mois", mois:3 },
+  "6": { label:"6 mois", mois:6 },
+  "12": { label:"12 mois", mois:12 },
+};
+const CONFIG_DEFAUT = { prix1:"1500", prix3:"4000", prix6:"7500", prix12:"14000", numeroMobileMoney:"+229 00 00 00 00" };
+
 const emptyPlanner = ()=>({
   dateDebut:new Date().toISOString().slice(0,10),
   salaire:"", depenses:[], objectif:{nom:"",montant:"",dateLimite:""},
-  cotisations:[], tontine:{nom:"",valeurMax:"",fraisRetraitPct:"",membres:[]}
+  cotisations:[], tontine:{nom:"",valeurMax:"",fraisRetraitPct:"",membres:[]},
+  moisData:{}
 });
+
+/* ---------- Firestore access : configuration & demandes ---------- */
+async function getConfig(){
+  try{
+    const snap = await getDoc(doc(db,"config","parametres"));
+    if(snap.exists()) return { ...CONFIG_DEFAUT, ...snap.data() };
+  }catch(e){}
+  return { ...CONFIG_DEFAUT };
+}
+async function saveConfig(cfg){ await setDoc(doc(db,"config","parametres"), cfg); }
+async function getDemandes(){
+  const snap = await getDocs(collection(db,"demandes"));
+  const list=[]; snap.forEach(d=>list.push(d.data()));
+  return list.sort((a,b)=> (b.dateCreation||"").localeCompare(a.dateCreation||""));
+}
+async function saveDemande(demande){ await setDoc(doc(db,"demandes",demande.id), demande); }
+async function deleteDemandeDoc(id){ await deleteDoc(doc(db,"demandes",id)); }
 
 /* ---------- Firestore access ---------- */
 async function getRegistry(){
@@ -154,13 +193,26 @@ async function saveClient(client){ await setDoc(doc(db,"clients",client.id), cli
 async function deleteClientDoc(id){ await deleteDoc(doc(db,"clients",id)); }
 async function getPlannerData(code){
   const snap = await getDoc(doc(db,"plannerData",code));
-  if(snap.exists()) return { ...emptyPlanner(), ...snap.data() };
-  return emptyPlanner();
+  let data = snap.exists() ? { ...emptyPlanner(), ...snap.data() } : emptyPlanner();
+  if(!data.moisData) data.moisData = {};
+  // Migration : anciennes données salaire/dépenses (avant l'historique mensuel)
+  // sont rapatriées dans le mois en cours si ce mois n'a pas encore de données.
+  const moisCourant = moisActuelKey();
+  if(!data.moisData[moisCourant] && (data.salaire || (data.depenses && data.depenses.length))){
+    data.moisData[moisCourant] = { salaire: data.salaire||"", depenses: data.depenses||[] };
+  }
+  return data;
 }
 async function savePlannerData(code,data){ await setDoc(doc(db,"plannerData",code), data); }
 
 /* ---------- App state ---------- */
-let state = { view:"login", codeInput:"", loginError:"", currentClient:null, registry:[], plannerData:null };
+let state = {
+  view:"login", codeInput:"", loginError:"", loginExpiredCode:"",
+  currentClient:null, registry:[], plannerData:null,
+  config:null, demandes:[],
+  regType:"inscription", regNom:"", regEmail:"", regWhatsapp:"", regFormule:"1",
+  payMontant:"", payNumero:"", payReference:"", payError:""
+};
 const app = document.getElementById("app");
 
 function render(){
@@ -168,6 +220,9 @@ function render(){
   if (state.view==="login") app.innerHTML = renderLogin();
   else if (state.view==="admin") app.innerHTML = renderAdmin();
   else if (state.view==="app") app.innerHTML = renderClientApp();
+  else if (state.view==="registerInfo") app.innerHTML = renderRegisterInfo();
+  else if (state.view==="registerPayment") app.innerHTML = renderRegisterPayment();
+  else if (state.view==="registerSent") app.innerHTML = renderRegisterSent();
   attachEvents();
 }
 
@@ -183,6 +238,7 @@ function renderConfigWarning(){
 
 /* ---------- LOGIN VIEW ---------- */
 function renderLogin(){
+  const estExpire = state.loginExpiredCode && state.loginError.includes("expiré");
   return `
   <div class="login-wrap">
     <div class="login-badge">S.M. DIGITAL</div>
@@ -191,13 +247,103 @@ function renderLogin(){
     <input id="codeInput" class="input-login" placeholder="Ex: ABC-1234" value="${esc(state.codeInput)}" />
     ${state.loginError ? `<div class="login-error">⚠️ ${esc(state.loginError)}</div>` : ""}
     <button id="loginBtn" class="login-btn btn">🔒 Accéder</button>
-    <div class="login-hint">Pas encore de code ? Contacte S.M. Digital pour t'abonner (mobile money via Chariow).</div>
+    ${estExpire ? `<button id="renewFromLoginBtn" class="btn-primary btn" style="width:100%;justify-content:center;margin-top:10px;">🔄 Renouveler mon abonnement</button>` : ""}
+    <div class="login-hint">
+      Pas encore de code ? <span id="goRegisterLink" style="color:var(--gold);text-decoration:underline;cursor:pointer;">Crée ton compte et abonne-toi</span>
+    </div>
   </div>`;
 }
 
+/* ---------- REGISTER : identité + formule ---------- */
+function renderRegisterInfo(){
+  const cfg = state.config || CONFIG_DEFAUT;
+  const titre = state.regType==="renouvellement" ? "Renouveler mon abonnement" : "Créer mon compte";
+  return `
+  <div class="login-wrap" style="max-width:440px;">
+    <div class="login-badge">S.M. DIGITAL</div>
+    <div class="login-title">${titre}</div>
+    ${state.regType!=="renouvellement" ? `
+    <div style="text-align:left;margin-top:16px;">
+      <label class="field-label">Nom et prénom</label>
+      <input id="regNom" class="input" placeholder="Ex: Fatou Diallo" value="${esc(state.regNom)}"/>
+      <label class="field-label" style="margin-top:12px;">Adresse email</label>
+      <input id="regEmail" class="input" type="email" placeholder="Ex: fatou@gmail.com" value="${esc(state.regEmail)}"/>
+      <label class="field-label" style="margin-top:12px;">Numéro WhatsApp</label>
+      <input id="regWhatsapp" class="input" placeholder="Ex: 07 00 00 00 00" value="${esc(state.regWhatsapp)}"/>
+    </div>` : `
+    <div style="text-align:left;margin-top:16px;">
+      <label class="field-label">Ton code d'accès actuel</label>
+      <input id="regCodeExistant" class="input" placeholder="Ex: ABC-1234" value="${esc(state.loginExpiredCode||"")}"/>
+    </div>`}
+
+    <div style="text-align:left;margin-top:18px;">
+      <label class="field-label">Choisis ta formule</label>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+        ${Object.entries(FORMULES).map(([key,f])=>`
+          <label style="display:flex;align-items:center;justify-content:space-between;background:${state.regFormule===key?'var(--card)':'var(--bg)'};border:1px solid ${state.regFormule===key?'var(--gold)':'var(--input-border)'};border-radius:10px;padding:12px 14px;cursor:pointer;">
+            <span style="display:flex;align-items:center;gap:10px;">
+              <input type="radio" name="regFormule" value="${key}" ${state.regFormule===key?"checked":""} class="formuleRadio" style="width:auto;"/>
+              <span style="font-size:14px;">${f.label}</span>
+            </span>
+            <span style="font-weight:600;color:var(--gold-light);">${formatFCFA(cfg["prix"+key])}</span>
+          </label>
+        `).join("")}
+      </div>
+    </div>
+
+    <button id="regContinueBtn" class="login-btn btn">Continuer</button>
+    <div class="login-hint"><span id="backToLoginLink" style="color:var(--text-muted);text-decoration:underline;cursor:pointer;">← Retour à la connexion</span></div>
+  </div>`;
+}
+
+/* ---------- REGISTER : paiement ---------- */
+function renderRegisterPayment(){
+  const cfg = state.config || CONFIG_DEFAUT;
+  const f = FORMULES[state.regFormule];
+  const prix = cfg["prix"+state.regFormule];
+  return `
+  <div class="login-wrap" style="max-width:440px;">
+    <div class="login-badge">S.M. DIGITAL</div>
+    <div class="login-title">Paiement — ${f.label}</div>
+    <div class="recommend-box" style="text-align:left;">
+      <div>📱</div>
+      <div>
+        <div class="recommend-value">${formatFCFA(prix)}</div>
+        <div class="recommend-sub">Envoie ce montant par Mobile Money au numéro :<br/><strong style="color:var(--text);">${esc(cfg.numeroMobileMoney)}</strong></div>
+      </div>
+    </div>
+    <div style="text-align:left;margin-top:16px;">
+      <label class="field-label">Montant payé</label>
+      <input id="payMontant" class="input" type="number" placeholder="Ex: ${prix}" value="${esc(state.payMontant)}"/>
+      <label class="field-label" style="margin-top:12px;">Numéro utilisé pour le paiement</label>
+      <input id="payNumero" class="input" placeholder="Ex: 07 00 00 00 00" value="${esc(state.payNumero)}"/>
+      <label class="field-label" style="margin-top:12px;">Référence de la transaction</label>
+      <input id="payReference" class="input" placeholder="Ex: MP240827.1234" value="${esc(state.payReference)}"/>
+    </div>
+    ${state.payError ? `<div class="login-error">⚠️ ${esc(state.payError)}</div>` : ""}
+    <button id="payConfirmBtn" class="login-btn btn">✅ Confirmer mon paiement</button>
+    <div class="login-hint"><span id="backToRegisterInfoLink" style="color:var(--text-muted);text-decoration:underline;cursor:pointer;">← Retour</span></div>
+  </div>`;
+}
+
+/* ---------- REGISTER : confirmation envoyée ---------- */
+function renderRegisterSent(){
+  return `
+  <div class="login-wrap">
+    <div style="font-size:40px;margin-bottom:10px;">✅</div>
+    <div class="login-title">Demande envoyée !</div>
+    <div class="login-sub" style="margin-bottom:0;">
+      Ta demande a été transmise à S.M. Digital. Ton code d'accès te sera envoyé par WhatsApp
+      dès que ton paiement sera validé — généralement sous quelques heures.
+    </div>
+    <button id="backToLoginFromSentBtn" class="login-btn btn" style="margin-top:20px;">Retour à l'accueil</button>
+  </div>`;
+}
 /* ---------- ADMIN VIEW ---------- */
 function renderAdmin(){
   const clients = state.registry.filter(c=>c.id!=="seed-owner");
+  const cfg = state.config || CONFIG_DEFAUT;
+  const demandesEnAttente = (state.demandes||[]).filter(dd=>dd.statut==="en_attente");
   const dateAbonnement = state._adminDate || new Date().toISOString().slice(0,10);
   const dateExpPrevue = addDays(dateAbonnement, DUREE_ABONNEMENT_JOURS);
   return `
@@ -206,8 +352,42 @@ function renderAdmin(){
     <button id="logoutBtn" class="logout-btn">↩ Quitter</button>
   </div>
 
+  ${demandesEnAttente.length>0 ? `
+  <div class="card" style="border-color:var(--gold);">
+    <div class="card-header">🔔 Demandes en attente (${demandesEnAttente.length})</div>
+    ${demandesEnAttente.map(dd=>{
+      const f = FORMULES[dd.formule]||FORMULES["1"];
+      return `
+      <div class="membre-card">
+        <div class="membre-header">
+          <div class="membre-nom-wrap">
+            <div class="membre-avatar">${esc((dd.nom||"?").trim().charAt(0).toUpperCase())}</div>
+            <div>
+              <div class="membre-nom">${esc(dd.nom||dd.codeExistant||"Renouvellement")}</div>
+              <div style="font-size:11px;color:var(--text-faint);margin-top:2px;">
+                ${dd.type==="renouvellement" ? `Renouvellement · ${esc(dd.codeExistant)}` : `${esc(dd.email||"")} · ${esc(dd.whatsapp||"")}`}
+              </div>
+            </div>
+          </div>
+          <span class="status-badge" style="background:#3a3320;color:var(--yellow);">${f.label}</span>
+        </div>
+        <div class="client-dates-row">
+          <span>Montant : ${formatFCFA(dd.montantPaye)}</span>
+          <span>Réf : ${esc(dd.reference)}</span>
+        </div>
+        <div class="client-dates-row">
+          <span>Numéro utilisé : ${esc(dd.numeroPaiement)}</span>
+        </div>
+        <div class="client-actions-row">
+          <button class="btn-muted btn validerDemandeBtn" data-id="${dd.id}" style="color:var(--green);">✅ Valider</button>
+          <button class="btn-muted btn rejeterDemandeBtn" data-id="${dd.id}" style="color:var(--red);">✕ Rejeter</button>
+        </div>
+      </div>`;
+    }).join("")}
+  </div>` : ""}
+
   <div class="card">
-    <div class="card-header">➕ Ajouter un client abonné</div>
+    <div class="card-header">➕ Ajouter un client abonné manuellement</div>
     <div class="grid-2">
       <div><label class="field-label">Nom du client</label><input id="admNom" class="input" placeholder="Ex: Fatou Diallo" value="${esc(state._admNom||"")}"/></div>
       <div><label class="field-label">Téléphone (mobile money)</label><input id="admTel" class="input" placeholder="Ex: 07 00 00 00 00" value="${esc(state._admTel||"")}"/></div>
@@ -222,6 +402,19 @@ function renderAdmin(){
       </div>
     </div>
     <button id="admAddBtn" class="btn-primary btn" style="width:100%;justify-content:center;margin-top:16px;">➕ Créer le compte client</button>
+  </div>
+
+  <div class="card">
+    <div class="card-header">💳 Paramètres d'abonnement</div>
+    <div class="grid-2">
+      <div><label class="field-label">Prix 1 mois (FCFA)</label><input id="cfgPrix1" class="input" type="number" value="${esc(cfg.prix1)}"/></div>
+      <div><label class="field-label">Prix 3 mois (FCFA)</label><input id="cfgPrix3" class="input" type="number" value="${esc(cfg.prix3)}"/></div>
+      <div><label class="field-label">Prix 6 mois (FCFA)</label><input id="cfgPrix6" class="input" type="number" value="${esc(cfg.prix6)}"/></div>
+      <div><label class="field-label">Prix 12 mois (FCFA)</label><input id="cfgPrix12" class="input" type="number" value="${esc(cfg.prix12)}"/></div>
+    </div>
+    <label class="field-label" style="margin-top:12px;">Numéro Mobile Money</label>
+    <input id="cfgNumero" class="input" value="${esc(cfg.numeroMobileMoney)}"/>
+    <button id="saveConfigBtn" class="btn-primary btn" style="width:100%;justify-content:center;margin-top:16px;">💾 Enregistrer les paramètres</button>
   </div>
 
   <div class="card">
@@ -263,8 +456,11 @@ function renderAdmin(){
 function renderClientApp(){
   const client = state.currentClient;
   const d = state.plannerData;
-  const totalDepenses = d.depenses.reduce((s,x)=>s+(Number(x.montant)||0),0);
-  const resteDisponible = (Number(d.salaire)||0) - totalDepenses;
+  const mois = state.moisSelectionne || moisActuelKey();
+  const md = d.moisData[mois] || moisVide();
+  const totalDepenses = md.depenses.reduce((s,x)=>s+(Number(x.montant)||0),0);
+  const resteDisponible = (Number(md.salaire)||0) - totalDepenses;
+  const estMoisActuel = mois===moisActuelKey();
   const totalCotise = d.cotisations.reduce((s,x)=>s+(Number(x.montant)||0),0);
   const objMontant = Number(d.objectif.montant)||0;
   const progression = objMontant>0 ? Math.min((totalCotise/objMontant)*100,100) : 0;
@@ -312,11 +508,16 @@ function renderClientApp(){
   <div class="grid-2">
     <div class="card">
       <div class="card-header">💰 Salaire &amp; dépenses</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg);border:1px solid var(--input-border);border-radius:10px;padding:8px 10px;margin-bottom:16px;">
+        <button id="moisPrevBtn" class="icon-btn" style="font-size:16px;">◀</button>
+        <span style="font-weight:600;font-size:14px;">${formatMoisLabel(mois)}${estMoisActuel?" <span style=\"color:var(--gold);font-size:11px;\">· en cours</span>":""}</span>
+        <button id="moisNextBtn" class="icon-btn" style="font-size:16px;">▶</button>
+      </div>
       <label class="field-label">Salaire mensuel</label>
-      <input id="salaire" class="input" type="number" placeholder="Ex: 150000" value="${esc(d.salaire)}"/>
+      <input id="salaire" class="input" type="number" placeholder="Ex: 150000" value="${esc(md.salaire)}"/>
       <label class="field-label" style="margin-top:18px;">Dépenses fixes</label>
-      ${d.depenses.length===0?`<div class="empty-hint">Aucune dépense ajoutée pour l'instant.</div>`:
-        d.depenses.map(x=>`<div class="row list-row"><span class="list-row-label">${esc(x.nom)}</span><span class="list-row-value">${formatFCFA(x.montant)}</span><button class="icon-btn del delDepense" data-id="${x.id}">🗑</button></div>`).join("")}
+      ${md.depenses.length===0?`<div class="empty-hint">Aucune dépense ajoutée pour ${formatMoisLabel(mois)}.</div>`:
+        md.depenses.map(x=>`<div class="row list-row"><span class="list-row-label">${esc(x.nom)}</span><span class="list-row-value">${formatFCFA(x.montant)}</span><button class="icon-btn del delDepense" data-id="${x.id}">🗑</button></div>`).join("")}
       <div class="add-row">
         <input id="newDepNom" class="input" style="flex:1.4;" placeholder="Nom (ex: Loyer)"/>
         <input id="newDepMontant" class="input" style="flex:1;" type="number" placeholder="Montant"/>
@@ -407,6 +608,39 @@ function attachEvents(){
     ci?.addEventListener("input",e=>state.codeInput=e.target.value);
     ci?.addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
     document.getElementById("loginBtn")?.addEventListener("click",doLogin);
+    document.getElementById("goRegisterLink")?.addEventListener("click", async ()=>{
+      state.regType="inscription"; state.config = await getConfig(); state.view="registerInfo"; render();
+    });
+    document.getElementById("renewFromLoginBtn")?.addEventListener("click", async ()=>{
+      state.regType="renouvellement"; state.config = await getConfig(); state.view="registerInfo"; render();
+    });
+  }
+  if (state.view==="registerInfo"){
+    document.getElementById("regNom")?.addEventListener("input",e=>state.regNom=e.target.value);
+    document.getElementById("regEmail")?.addEventListener("input",e=>state.regEmail=e.target.value);
+    document.getElementById("regWhatsapp")?.addEventListener("input",e=>state.regWhatsapp=e.target.value);
+    document.getElementById("regCodeExistant")?.addEventListener("input",e=>state.loginExpiredCode=e.target.value);
+    document.querySelectorAll(".formuleRadio").forEach(r=>r.addEventListener("change",e=>{ state.regFormule=e.target.value; render(); }));
+    document.getElementById("regContinueBtn")?.addEventListener("click",()=>{
+      if(state.regType!=="renouvellement" && !state.regNom.trim()){ return; }
+      if(state.regType==="renouvellement" && !(state.loginExpiredCode||"").trim()){ return; }
+      state.view="registerPayment"; render();
+    });
+    document.getElementById("backToLoginLink")?.addEventListener("click",()=>{ state.view="login"; render(); });
+  }
+  if (state.view==="registerPayment"){
+    document.getElementById("payMontant")?.addEventListener("input",e=>state.payMontant=e.target.value);
+    document.getElementById("payNumero")?.addEventListener("input",e=>state.payNumero=e.target.value);
+    document.getElementById("payReference")?.addEventListener("input",e=>state.payReference=e.target.value);
+    document.getElementById("payConfirmBtn")?.addEventListener("click",soumettrePaiement);
+    document.getElementById("backToRegisterInfoLink")?.addEventListener("click",()=>{ state.view="registerInfo"; render(); });
+  }
+  if (state.view==="registerSent"){
+    document.getElementById("backToLoginFromSentBtn")?.addEventListener("click",()=>{
+      state = { ...state, view:"login", codeInput:"", loginError:"", loginExpiredCode:"",
+        regNom:"", regEmail:"", regWhatsapp:"", regFormule:"1", payMontant:"", payNumero:"", payReference:"", payError:"" };
+      render();
+    });
   }
   if (state.view==="admin"){
     document.getElementById("logoutBtn")?.addEventListener("click",doLogout);
@@ -417,11 +651,24 @@ function attachEvents(){
     document.querySelectorAll(".renewBtn").forEach(b=>b.addEventListener("click",()=>renewClient(b.dataset.id)));
     document.querySelectorAll(".toggleBtn").forEach(b=>b.addEventListener("click",()=>toggleClient(b.dataset.id)));
     document.querySelectorAll(".delBtn").forEach(b=>b.addEventListener("click",()=>deleteClient(b.dataset.id)));
+    document.querySelectorAll(".validerDemandeBtn").forEach(b=>b.addEventListener("click",()=>validerDemande(b.dataset.id)));
+    document.querySelectorAll(".rejeterDemandeBtn").forEach(b=>b.addEventListener("click",()=>rejeterDemande(b.dataset.id)));
+    document.getElementById("cfgPrix1")?.addEventListener("input",e=>{ state.config=state.config||{...CONFIG_DEFAUT}; state.config.prix1=e.target.value; });
+    document.getElementById("cfgPrix3")?.addEventListener("input",e=>{ state.config=state.config||{...CONFIG_DEFAUT}; state.config.prix3=e.target.value; });
+    document.getElementById("cfgPrix6")?.addEventListener("input",e=>{ state.config=state.config||{...CONFIG_DEFAUT}; state.config.prix6=e.target.value; });
+    document.getElementById("cfgPrix12")?.addEventListener("input",e=>{ state.config=state.config||{...CONFIG_DEFAUT}; state.config.prix12=e.target.value; });
+    document.getElementById("cfgNumero")?.addEventListener("input",e=>{ state.config=state.config||{...CONFIG_DEFAUT}; state.config.numeroMobileMoney=e.target.value; });
+    document.getElementById("saveConfigBtn")?.addEventListener("click",async ()=>{
+      await saveConfig(state.config||CONFIG_DEFAUT);
+      alert("Paramètres enregistrés !");
+    });
   }
   if (state.view==="app"){
     document.getElementById("logoutBtn")?.addEventListener("click",doLogout);
+    document.getElementById("moisPrevBtn")?.addEventListener("click",()=>{ state.moisSelectionne=decalerMois(state.moisSelectionne||moisActuelKey(),-1); render(); });
+    document.getElementById("moisNextBtn")?.addEventListener("click",()=>{ state.moisSelectionne=decalerMois(state.moisSelectionne||moisActuelKey(),1); render(); });
     bindDebounced("dateDebut", v=>state.plannerData.dateDebut=v);
-    bindDebounced("salaire", v=>state.plannerData.salaire=v);
+    bindDebounced("salaire", v=>{ ensureMois(); state.plannerData.moisData[state.moisSelectionne].salaire=v; });
     bindDebounced("objNom", v=>state.plannerData.objectif.nom=v);
     bindDebounced("objMontant", v=>state.plannerData.objectif.montant=v);
     bindDebounced("objDate", v=>state.plannerData.objectif.dateLimite=v);
@@ -446,11 +693,13 @@ function bindDebounced(id,setter){
 
 /* ---------- Actions ---------- */
 async function doLogin(){
-  state.loginError="";
+  state.loginError=""; state.loginExpiredCode="";
   const code=(state.codeInput||"").trim().toUpperCase();
   if(!code) return;
   if(code===ADMIN_CODE){
     state.registry = await getRegistry();
+    state.demandes = await getDemandes();
+    state.config = await getConfig();
     state.view="admin"; render(); return;
   }
   const registry = await getRegistry();
@@ -463,12 +712,75 @@ async function doLogin(){
   }
   if(!client){ state.loginError="Code d'accès invalide. Vérifie et réessaie."; render(); return; }
   if(!client.actif){ state.loginError="Cet abonnement a été désactivé. Contacte S.M. Digital."; render(); return; }
-  if(joursRestants(client.dateExpiration)<0){ state.loginError="Ton abonnement a expiré. Renouvelle-le pour continuer."; render(); return; }
+  if(joursRestants(client.dateExpiration)<0){
+    state.loginError="Ton abonnement a expiré. Renouvelle-le pour continuer.";
+    state.loginExpiredCode=code;
+    render(); return;
+  }
   state.currentClient=client;
   state.plannerData = await getPlannerData(client.code);
+  state.moisSelectionne = moisActuelKey();
   state.view="app"; render();
 }
-function doLogout(){ state={view:"login",codeInput:"",loginError:"",currentClient:null,registry:[],plannerData:null}; render(); }
+function doLogout(){ state={view:"login",codeInput:"",loginError:"",loginExpiredCode:"",currentClient:null,registry:[],plannerData:null,moisSelectionne:null,config:null,demandes:[],regType:"inscription",regNom:"",regEmail:"",regWhatsapp:"",regFormule:"1",payMontant:"",payNumero:"",payReference:"",payError:""}; render(); }
+
+async function soumettrePaiement(){
+  state.payError="";
+  const montant = Number(state.payMontant);
+  if(!montant){ state.payError="Indique le montant payé."; render(); return; }
+  if(!(state.payNumero||"").trim()){ state.payError="Indique le numéro utilisé pour le paiement."; render(); return; }
+  if(!(state.payReference||"").trim()){ state.payError="Indique la référence de la transaction."; render(); return; }
+  const demande = {
+    id: uid(),
+    type: state.regType,
+    nom: state.regNom.trim(),
+    email: state.regEmail.trim(),
+    whatsapp: state.regWhatsapp.trim(),
+    codeExistant: (state.loginExpiredCode||"").trim().toUpperCase(),
+    formule: state.regFormule,
+    montantPaye: montant,
+    numeroPaiement: state.payNumero.trim(),
+    reference: state.payReference.trim(),
+    dateCreation: new Date().toISOString(),
+    statut: "en_attente",
+  };
+  await saveDemande(demande);
+  state.view="registerSent"; render();
+}
+
+async function validerDemande(id){
+  const dd = (state.demandes||[]).find(x=>x.id===id); if(!dd) return;
+  const f = FORMULES[dd.formule]||FORMULES["1"];
+  const jours = f.mois*30;
+  if(dd.type==="renouvellement"){
+    const registry = await getRegistry();
+    const c = registry.find(x=>x.code.toUpperCase()===(dd.codeExistant||"").toUpperCase());
+    if(c){
+      const base = joursRestants(c.dateExpiration)>0 ? c.dateExpiration : new Date().toISOString().slice(0,10);
+      c.dateExpiration = addDays(base, jours); c.actif=true;
+      await saveClient(c);
+    }
+  } else {
+    const dateAbonnement = new Date().toISOString().slice(0,10);
+    const client = {
+      id: uid(), nom: dd.nom, telephone: dd.whatsapp, email: dd.email,
+      code: genererCode(dd.nom), dateAbonnement, dateExpiration: addDays(dateAbonnement, jours), actif:true
+    };
+    await saveClient(client);
+  }
+  dd.statut="validee";
+  await saveDemande(dd);
+  state.registry = await getRegistry();
+  state.demandes = await getDemandes();
+  render();
+}
+async function rejeterDemande(id){
+  const dd = (state.demandes||[]).find(x=>x.id===id); if(!dd) return;
+  dd.statut="rejetee";
+  await saveDemande(dd);
+  state.demandes = await getDemandes();
+  render();
+}
 
 async function addClient(){
   const nom=(state._admNom||"").trim(); if(!nom) return;
@@ -493,6 +805,12 @@ async function deleteClient(id){
   await deleteClientDoc(id); state.registry = await getRegistry(); render();
 }
 
+function ensureMois(){
+  const mois = state.moisSelectionne || moisActuelKey();
+  if(!state.plannerData.moisData) state.plannerData.moisData = {};
+  if(!state.plannerData.moisData[mois]) state.plannerData.moisData[mois] = moisVide();
+  state.moisSelectionne = mois;
+}
 async function persistPlanner(rerender=true){
   await savePlannerData(state.currentClient.code, state.plannerData);
   if(rerender) render();
@@ -501,7 +819,8 @@ async function addDepense(){
   const nom=document.getElementById("newDepNom").value.trim();
   const montant=Number(document.getElementById("newDepMontant").value);
   if(!nom||!montant) return;
-  state.plannerData.depenses.push({id:uid(),nom,montant});
+  ensureMois();
+  state.plannerData.moisData[state.moisSelectionne].depenses.push({id:uid(),nom,montant});
   await persistPlanner();
 }
 async function addCotisation(){
@@ -511,7 +830,13 @@ async function addCotisation(){
   await persistPlanner();
 }
 async function removeItem(key,id){
-  state.plannerData[key]=state.plannerData[key].filter(x=>x.id!==id);
+  if(key==="depenses"){
+    ensureMois();
+    state.plannerData.moisData[state.moisSelectionne].depenses =
+      state.plannerData.moisData[state.moisSelectionne].depenses.filter(x=>x.id!==id);
+  } else {
+    state.plannerData[key]=state.plannerData[key].filter(x=>x.id!==id);
+  }
   await persistPlanner();
 }
 async function addMembre(){
