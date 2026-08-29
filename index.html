@@ -82,6 +82,29 @@
   .error-banner{background:#3a2020;border:1px solid #5a3030;color:var(--red);padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:16px;}
   .config-warning{background:#3a3320;border:1px solid #5a5030;color:var(--yellow);padding:14px;border-radius:10px;font-size:13px;margin-bottom:16px;line-height:1.5;}
   .loading-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--text-muted);}
+
+  /* ---- Ajouts : langue, accueil, onglets, archives, ventes ---- */
+  .lang-switch{display:flex;gap:6px;justify-content:center;margin-bottom:18px;}
+  .lang-btn{background:var(--bg);border:1px solid var(--input-border);border-radius:8px;padding:5px 12px;font-size:12px;color:var(--text-muted);cursor:pointer;}
+  .lang-btn.active{background:var(--gold);color:#1a1410;font-weight:700;border-color:var(--gold);}
+  .home-mode-switch{display:flex;gap:8px;margin-bottom:20px;}
+  .home-mode-btn{flex:1;background:var(--bg);border:1px solid var(--input-border);border-radius:10px;padding:10px;font-size:13px;color:var(--text-muted);cursor:pointer;text-align:center;font-weight:600;}
+  .home-mode-btn.active{background:var(--gold);color:#1a1410;border-color:var(--gold);}
+  .signup-success{background:#20351f;border:1px solid #345033;color:var(--green);padding:14px;border-radius:10px;font-size:13px;line-height:1.5;text-align:left;}
+  .tab-bar{display:flex;gap:6px;overflow-x:auto;margin-bottom:18px;padding-bottom:2px;-webkit-overflow-scrolling:touch;}
+  .tab-btn{flex:1;white-space:nowrap;background:var(--card);border:1px solid var(--card-border);border-radius:10px;padding:10px 8px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;text-align:center;}
+  .tab-btn.active{background:var(--gold);color:#1a1410;border-color:var(--gold);}
+  .month-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px;background:var(--bg);border:1px solid var(--input-border);border-radius:10px;padding:8px 10px;}
+  .month-nav-btn{background:var(--card);border:1px solid var(--input-border);border-radius:8px;width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--text-dim);cursor:pointer;}
+  .month-nav-btn:disabled{opacity:.35;cursor:default;}
+  .month-nav-label{font-family:'Fraunces',serif;font-size:14px;font-weight:600;flex:1;text-align:center;}
+  .month-nav-tag{font-size:10px;color:var(--gold-light);font-weight:600;margin-left:4px;}
+  .pending-card{background:var(--bg);border:1px solid var(--yellow);border-radius:12px;padding:14px;margin-bottom:12px;}
+  .pending-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .article-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #2a2118;font-size:13px;}
+  .archive-item{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #2a2118;font-size:13px;cursor:pointer;}
+  .archive-item:hover .archive-item-label{color:var(--gold-light);}
+  .badge-count{background:var(--gold);color:#1a1410;font-size:10px;font-weight:700;border-radius:999px;padding:1px 7px;margin-left:6px;}
 </style>
 </head>
 <body>
@@ -97,9 +120,6 @@ import {
 
 /* ============================================================
    ÉTAPE OBLIGATOIRE : remplace cet objet par TA config Firebase.
-   Va sur https://console.firebase.google.com → crée un projet
-   (gratuit) → Paramètres du projet → "Ajouter une application Web"
-   → copie l'objet firebaseConfig généré ici.
    ============================================================ */
 const firebaseConfig = {
   apiKey: "AIzaSyBO1M6gt5n00t3CjO3-GlKSaUc3PkOD91M",
@@ -123,12 +143,73 @@ if (!CONFIG_MISSING) {
   db = getFirestore(fbApp);
 }
 
+/* ---------- Traductions (page d'accueil + espace client) ---------- */
+const T = {
+  fr:{
+    appBadge:"S.M. DIGITAL", appTitle:"Planificateur financier & tontine",
+    modeLogin:"Se connecter", modeSignup:"S'inscrire",
+    loginSub:"Entre ton code d'accès pour continuer",
+    codePlaceholder:"Ex: ABC-1234", accessBtn:"🔒 Accéder",
+    noCodeHint:"Pas encore de code ? Utilise l'onglet \"S'inscrire\" ci-dessus.",
+    signupTitle:"Demande d'abonnement", signupSub:"Remplis ce formulaire, tu recevras ton code d'accès par WhatsApp après validation du paiement.",
+    nomLabel:"Nom complet", emailLabel:"Adresse e-mail", whatsappLabel:"Numéro WhatsApp",
+    dateLabel:"Date de la demande", submitSignup:"📩 Envoyer ma demande",
+    signupSuccess:"✅ Ta demande a été envoyée ! Tu recevras ton code d'accès par WhatsApp dès validation du paiement.",
+    signupAnother:"Envoyer une autre demande",
+    tabSalaire:"💰 Salaire", tabObjectif:"🎯 Objectif", tabVentes:"🛍️ Ventes", tabTontine:"👨‍👩‍👧‍👦 Tontine",
+    salaireHeader:"💰 Salaire & dépenses", salaireMensuel:"Salaire mensuel", depensesFixes:"Dépenses fixes",
+    aucuneDepense:"Aucune dépense ajoutée pour ce mois.", nomDepense:"Nom (ex: Loyer)", montant:"Montant",
+    resteDispo:"Reste disponible", enCours:"en cours", archive:"archivé",
+    objectifHeader:"🎯 Ton objectif", nomObjectif:"Nom de l'objectif", montantCible:"Montant cible",
+    dateLimite:"Date limite", parMois:"/ mois", moisRestants:"mois pour atteindre ton objectif à temps",
+    cotisationsHeader:"🐷 Suivi des cotisations", montantVerse:"Montant versé aujourd'hui", ajouter:"➕ Ajouter",
+    aucunVersement:"Aucun versement enregistré.", cotise:"cotisé", restant:"restant", atteint:"atteint",
+    ventesHeader:"🛍️ Ventes du jour", dateVente:"Date", article:"Article", prixUnitaire:"Prix unitaire",
+    quantite:"Qté", totalJour:"Total du jour", sauvegarder:"💾 Sauvegarder la journée",
+    archivesVentes:"Archives des ventes", aucuneVente:"Aucun article pour cette date.",
+    tontineHeader:"👨‍👩‍👧‍👦 Tontine familiale", nomTontine:"Nom de la tontine", valeurMax:"Valeur maximale",
+    fraisRetrait:"Frais retrait (%)", collecte:"Somme totale collectée", ajouterMembre:"Ajouter un membre",
+    nomMembre:"Nom du membre", aucunMembre:"Aucun membre pour l'instant.", montantDepot:"Montant du dépôt",
+    bonjour:"Bonjour", abonneJusquau:"Abonnement valide jusqu'au", abonneExpire:"Abonnement expiré",
+    deconnexion:"↩ Se déconnecter"
+  },
+  en:{
+    appBadge:"S.M. DIGITAL", appTitle:"Financial planner & tontine",
+    modeLogin:"Log in", modeSignup:"Sign up",
+    loginSub:"Enter your access code to continue",
+    codePlaceholder:"E.g: ABC-1234", accessBtn:"🔒 Access",
+    noCodeHint:"No code yet? Use the \"Sign up\" tab above.",
+    signupTitle:"Subscription request", signupSub:"Fill in this form, you'll receive your access code on WhatsApp once payment is validated.",
+    nomLabel:"Full name", emailLabel:"Email address", whatsappLabel:"WhatsApp number",
+    dateLabel:"Request date", submitSignup:"📩 Send my request",
+    signupSuccess:"✅ Your request has been sent! You'll receive your access code on WhatsApp once payment is validated.",
+    signupAnother:"Send another request",
+    tabSalaire:"💰 Salary", tabObjectif:"🎯 Goal", tabVentes:"🛍️ Sales", tabTontine:"👨‍👩‍👧‍👦 Tontine",
+    salaireHeader:"💰 Salary & expenses", salaireMensuel:"Monthly salary", depensesFixes:"Fixed expenses",
+    aucuneDepense:"No expense added for this month.", nomDepense:"Name (e.g: Rent)", montant:"Amount",
+    resteDispo:"Available balance", enCours:"current", archive:"archived",
+    objectifHeader:"🎯 Your goal", nomObjectif:"Goal name", montantCible:"Target amount",
+    dateLimite:"Deadline", parMois:"/ month", moisRestants:"months to reach your goal on time",
+    cotisationsHeader:"🐷 Contributions tracking", montantVerse:"Amount paid today", ajouter:"➕ Add",
+    aucunVersement:"No contribution recorded yet.", cotise:"saved", restant:"left", atteint:"reached",
+    ventesHeader:"🛍️ Today's sales", dateVente:"Date", article:"Item", prixUnitaire:"Unit price",
+    quantite:"Qty", totalJour:"Day total", sauvegarder:"💾 Save the day",
+    archivesVentes:"Sales archive", aucuneVente:"No item for this date.",
+    tontineHeader:"👨‍👩‍👧‍👦 Family tontine", nomTontine:"Tontine name", valeurMax:"Maximum value",
+    fraisRetrait:"Withdrawal fee (%)", collecte:"Total collected", ajouterMembre:"Add a member",
+    nomMembre:"Member name", aucunMembre:"No member yet.", montantDepot:"Deposit amount",
+    bonjour:"Hello", abonneJusquau:"Subscription valid until", abonneExpire:"Subscription expired",
+    deconnexion:"↩ Log out"
+  }
+};
+function t(key){ return (T[state.lang] && T[state.lang][key]) || (T.fr[key]) || key; }
+
 /* ---------- Helpers ---------- */
 function formatFCFA(n){ const v=Number(n)||0; return v.toLocaleString("fr-FR",{maximumFractionDigits:0})+" FCFA"; }
 function monthsBetween(from,to){ if(!to) return 0; const a=new Date(from), b=new Date(to);
   return Math.max((b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth()),0); }
-function formatDateLongue(iso){ if(!iso) return ""; return new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"}); }
-function formatDateCourte(iso){ if(!iso) return ""; return new Date(iso).toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"numeric"}); }
+function formatDateLongue(iso){ if(!iso) return ""; return new Date(iso).toLocaleDateString(state.lang==="en"?"en-GB":"fr-FR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"}); }
+function formatDateCourte(iso){ if(!iso) return ""; return new Date(iso).toLocaleDateString(state.lang==="en"?"en-GB":"fr-FR",{day:"2-digit",month:"short",year:"numeric"}); }
 function addDays(iso,days){ const d=new Date(iso); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); }
 function joursRestants(exp){ const now=new Date(); const e=new Date(exp); return Math.ceil((e-now)/86400000); }
 function genererCode(nom){
@@ -138,50 +219,41 @@ function genererCode(nom){
 function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
 
-const NOMS_MOIS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
-function moisActuelKey(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; }
-function formatMoisLabel(key){
-  const [y,m]=key.split("-").map(Number);
-  return `${NOMS_MOIS[m-1]} ${y}`;
-}
-function decalerMois(key,delta){
-  const [y,m]=key.split("-").map(Number);
-  const d=new Date(y, m-1+delta, 1);
+function monthKeyFromOffset(offset){
+  const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+offset);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
 }
-function moisVide(){ return { salaire:"", depenses:[] }; }
-
-const FORMULES = {
-  "1": { label:"1 mois", mois:1 },
-  "3": { label:"3 mois", mois:3 },
-  "6": { label:"6 mois", mois:6 },
-  "12": { label:"12 mois", mois:12 },
-};
-const CONFIG_DEFAUT = { prix1:"1500", prix3:"4000", prix6:"7500", prix12:"14000", numeroMobileMoney:"+229 00 00 00 00" };
+function monthLabel(key){
+  const [y,m]=key.split("-").map(Number);
+  const d=new Date(y,m-1,1);
+  const s=d.toLocaleDateString(state.lang==="en"?"en-GB":"fr-FR",{month:"long",year:"numeric"});
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+function todayISO(){ return new Date().toISOString().slice(0,10); }
 
 const emptyPlanner = ()=>({
-  dateDebut:new Date().toISOString().slice(0,10),
-  salaire:"", depenses:[], objectif:{nom:"",montant:"",dateLimite:""},
-  cotisations:[], tontine:{nom:"",valeurMax:"",fraisRetraitPct:"",membres:[]},
-  moisData:{}
+  dateDebut:todayISO(),
+  finance:{},                                   // { "2026-08": { salaire, depenses:[{id,nom,montant}] } }
+  objectif:{nom:"",montant:"",dateLimite:""},
+  cotisations:[],
+  ventes:{},                                     // { "2026-08-27": { objets:[{id,nom,prix,qte}] } }
+  tontine:{nom:"",valeurMax:"",fraisRetraitPct:"",membres:[]}
 });
+function emptyMoisFinance(){ return { salaire:"", depenses:[] }; }
+function emptyJourVente(){ return { objets:[] }; }
 
-/* ---------- Firestore access : configuration & demandes ---------- */
-async function getConfig(){
-  try{
-    const snap = await getDoc(doc(db,"config","parametres"));
-    if(snap.exists()) return { ...CONFIG_DEFAUT, ...snap.data() };
-  }catch(e){}
-  return { ...CONFIG_DEFAUT };
+function migratePlanner(data){
+  // Compatibilité avec l'ancien format à plat (salaire/dépenses au premier niveau)
+  const out = { ...emptyPlanner(), ...data };
+  if(!out.finance) out.finance = {};
+  if((data.salaire!==undefined || data.depenses!==undefined) && Object.keys(out.finance).length===0){
+    const key = monthKeyFromOffset(0);
+    out.finance[key] = { salaire: data.salaire||"", depenses: data.depenses||[] };
+  }
+  if(!out.ventes) out.ventes = {};
+  delete out.salaire; delete out.depenses;
+  return out;
 }
-async function saveConfig(cfg){ await setDoc(doc(db,"config","parametres"), cfg); }
-async function getDemandes(){
-  const snap = await getDocs(collection(db,"demandes"));
-  const list=[]; snap.forEach(d=>list.push(d.data()));
-  return list.sort((a,b)=> (b.dateCreation||"").localeCompare(a.dateCreation||""));
-}
-async function saveDemande(demande){ await setDoc(doc(db,"demandes",demande.id), demande); }
-async function deleteDemandeDoc(id){ await deleteDoc(doc(db,"demandes",id)); }
 
 /* ---------- Firestore access ---------- */
 async function getRegistry(){
@@ -193,36 +265,34 @@ async function saveClient(client){ await setDoc(doc(db,"clients",client.id), cli
 async function deleteClientDoc(id){ await deleteDoc(doc(db,"clients",id)); }
 async function getPlannerData(code){
   const snap = await getDoc(doc(db,"plannerData",code));
-  let data = snap.exists() ? { ...emptyPlanner(), ...snap.data() } : emptyPlanner();
-  if(!data.moisData) data.moisData = {};
-  // Migration : anciennes données salaire/dépenses (avant l'historique mensuel)
-  // sont rapatriées dans le mois en cours si ce mois n'a pas encore de données.
-  const moisCourant = moisActuelKey();
-  if(!data.moisData[moisCourant] && (data.salaire || (data.depenses && data.depenses.length))){
-    data.moisData[moisCourant] = { salaire: data.salaire||"", depenses: data.depenses||[] };
-  }
-  return data;
+  if(snap.exists()) return migratePlanner(snap.data());
+  return emptyPlanner();
 }
 async function savePlannerData(code,data){ await setDoc(doc(db,"plannerData",code), data); }
 
+async function getRegistrations(){
+  const snap = await getDocs(collection(db,"registrations"));
+  const list=[]; snap.forEach(d=>list.push(d.data()));
+  return list.sort((a,b)=> (a.date<b.date?1:-1));
+}
+async function saveRegistration(reg){ await setDoc(doc(db,"registrations",reg.id), reg); }
+async function deleteRegistrationDoc(id){ await deleteDoc(doc(db,"registrations",id)); }
+
 /* ---------- App state ---------- */
 let state = {
-  view:"login", codeInput:"", loginError:"", loginExpiredCode:"",
-  currentClient:null, registry:[], plannerData:null,
-  config:null, demandes:[],
-  regType:"inscription", regNom:"", regEmail:"", regWhatsapp:"", regFormule:"1",
-  payMontant:"", payNumero:"", payReference:"", payError:""
+  lang:"fr", view:"home", homeMode:"login",
+  codeInput:"", loginError:"", currentClient:null, registry:[], plannerData:null,
+  signupSuccess:false, _sgNom:"", _sgEmail:"", _sgWhatsapp:"",
+  registrations:[],
+  tab:"salaire", financeMonthOffset:0, venteDate:todayISO()
 };
 const app = document.getElementById("app");
 
 function render(){
   if (CONFIG_MISSING){ app.innerHTML = renderConfigWarning(); return; }
-  if (state.view==="login") app.innerHTML = renderLogin();
+  if (state.view==="home") app.innerHTML = renderHome();
   else if (state.view==="admin") app.innerHTML = renderAdmin();
   else if (state.view==="app") app.innerHTML = renderClientApp();
-  else if (state.view==="registerInfo") app.innerHTML = renderRegisterInfo();
-  else if (state.view==="registerPayment") app.innerHTML = renderRegisterPayment();
-  else if (state.view==="registerSent") app.innerHTML = renderRegisterSent();
   attachEvents();
 }
 
@@ -236,158 +306,87 @@ function renderConfigWarning(){
   </div></div>`;
 }
 
-/* ---------- LOGIN VIEW ---------- */
-function renderLogin(){
-  const estExpire = state.loginExpiredCode && state.loginError.includes("expiré");
+/* ---------- PAGE 1 : ACCUEIL (langue + connexion / inscription) ---------- */
+function renderHome(){
   return `
   <div class="login-wrap">
-    <div class="login-badge">S.M. DIGITAL</div>
-    <div class="login-title">Planificateur financier &amp; tontine</div>
-    <div class="login-sub">Entre ton code d'accès pour continuer</div>
-    <input id="codeInput" class="input-login" placeholder="Ex: ABC-1234" value="${esc(state.codeInput)}" />
+    <div class="lang-switch">
+      <button class="lang-btn ${state.lang==="fr"?"active":""} btn" data-lang="fr">Français</button>
+      <button class="lang-btn ${state.lang==="en"?"active":""} btn" data-lang="en">English</button>
+    </div>
+    <div class="login-badge">${t("appBadge")}</div>
+    <div class="login-title">${t("appTitle")}</div>
+
+    <div class="home-mode-switch">
+      <button class="home-mode-btn ${state.homeMode==="login"?"active":""} btn" data-mode="login">${t("modeLogin")}</button>
+      <button class="home-mode-btn ${state.homeMode==="signup"?"active":""} btn" data-mode="signup">${t("modeSignup")}</button>
+    </div>
+
+    ${state.homeMode==="login" ? renderHomeLogin() : renderHomeSignup()}
+  </div>`;
+}
+
+function renderHomeLogin(){
+  return `
+    <div class="login-sub" style="margin-bottom:16px;">${t("loginSub")}</div>
+    <input id="codeInput" class="input-login" placeholder="${t("codePlaceholder")}" value="${esc(state.codeInput)}" />
     ${state.loginError ? `<div class="login-error">⚠️ ${esc(state.loginError)}</div>` : ""}
-    <button id="loginBtn" class="login-btn btn">🔒 Accéder</button>
-    ${estExpire ? `<button id="renewFromLoginBtn" class="btn-primary btn" style="width:100%;justify-content:center;margin-top:10px;">🔄 Renouveler mon abonnement</button>` : ""}
-    <div class="login-hint">
-      Pas encore de code ? <span id="goRegisterLink" style="color:var(--gold);text-decoration:underline;cursor:pointer;">Crée ton compte et abonne-toi</span>
-    </div>
-  </div>`;
+    <button id="loginBtn" class="login-btn btn">${t("accessBtn")}</button>
+    <div class="login-hint">${t("noCodeHint")}</div>`;
 }
 
-/* ---------- REGISTER : identité + formule ---------- */
-function renderRegisterInfo(){
-  const cfg = state.config || CONFIG_DEFAUT;
-  const titre = state.regType==="renouvellement" ? "Renouveler mon abonnement" : "Créer mon compte";
+function renderHomeSignup(){
+  if(state.signupSuccess){
+    return `<div class="signup-success">${t("signupSuccess")}</div>
+      <button id="signupAgainBtn" class="btn-muted btn" style="width:100%;margin-top:14px;justify-content:center;">${t("signupAnother")}</button>`;
+  }
   return `
-  <div class="login-wrap" style="max-width:440px;">
-    <div class="login-badge">S.M. DIGITAL</div>
-    <div class="login-title">${titre}</div>
-    ${state.regType!=="renouvellement" ? `
-    <div style="text-align:left;margin-top:16px;">
-      <label class="field-label">Nom et prénom</label>
-      <input id="regNom" class="input" placeholder="Ex: Fatou Diallo" value="${esc(state.regNom)}"/>
-      <label class="field-label" style="margin-top:12px;">Adresse email</label>
-      <input id="regEmail" class="input" type="email" placeholder="Ex: fatou@gmail.com" value="${esc(state.regEmail)}"/>
-      <label class="field-label" style="margin-top:12px;">Numéro WhatsApp</label>
-      <input id="regWhatsapp" class="input" placeholder="Ex: 07 00 00 00 00" value="${esc(state.regWhatsapp)}"/>
-    </div>` : `
-    <div style="text-align:left;margin-top:16px;">
-      <label class="field-label">Ton code d'accès actuel</label>
-      <input id="regCodeExistant" class="input" placeholder="Ex: ABC-1234" value="${esc(state.loginExpiredCode||"")}"/>
-    </div>`}
-
-    <div style="text-align:left;margin-top:18px;">
-      <label class="field-label">Choisis ta formule</label>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
-        ${Object.entries(FORMULES).map(([key,f])=>`
-          <label style="display:flex;align-items:center;justify-content:space-between;background:${state.regFormule===key?'var(--card)':'var(--bg)'};border:1px solid ${state.regFormule===key?'var(--gold)':'var(--input-border)'};border-radius:10px;padding:12px 14px;cursor:pointer;">
-            <span style="display:flex;align-items:center;gap:10px;">
-              <input type="radio" name="regFormule" value="${key}" ${state.regFormule===key?"checked":""} class="formuleRadio" style="width:auto;"/>
-              <span style="font-size:14px;">${f.label}</span>
-            </span>
-            <span style="font-weight:600;color:var(--gold-light);">${formatFCFA(cfg["prix"+key])}</span>
-          </label>
-        `).join("")}
-      </div>
+    <div class="login-sub" style="text-align:left;margin-bottom:16px;">${t("signupSub")}</div>
+    <div style="text-align:left;">
+      <label class="field-label">${t("nomLabel")}</label>
+      <input id="sgNom" class="input" value="${esc(state._sgNom)}"/>
+      <label class="field-label" style="margin-top:14px;">${t("emailLabel")}</label>
+      <input id="sgEmail" class="input" type="email" value="${esc(state._sgEmail)}"/>
+      <label class="field-label" style="margin-top:14px;">${t("whatsappLabel")}</label>
+      <input id="sgWhatsapp" class="input" type="tel" placeholder="+229 ..." value="${esc(state._sgWhatsapp)}"/>
+      <label class="field-label" style="margin-top:14px;">${t("dateLabel")}</label>
+      <input class="input" value="${formatDateCourte(todayISO())}" disabled/>
     </div>
-
-    <button id="regContinueBtn" class="login-btn btn">Continuer</button>
-    <div class="login-hint"><span id="backToLoginLink" style="color:var(--text-muted);text-decoration:underline;cursor:pointer;">← Retour à la connexion</span></div>
-  </div>`;
+    ${state.loginError ? `<div class="login-error">⚠️ ${esc(state.loginError)}</div>` : ""}
+    <button id="signupBtn" class="login-btn btn">${t("submitSignup")}</button>`;
 }
 
-/* ---------- REGISTER : paiement ---------- */
-function renderRegisterPayment(){
-  const cfg = state.config || CONFIG_DEFAUT;
-  const f = FORMULES[state.regFormule];
-  const prix = cfg["prix"+state.regFormule];
-  return `
-  <div class="login-wrap" style="max-width:440px;">
-    <div class="login-badge">S.M. DIGITAL</div>
-    <div class="login-title">Paiement — ${f.label}</div>
-    <div class="recommend-box" style="text-align:left;">
-      <div>📱</div>
-      <div>
-        <div class="recommend-value">${formatFCFA(prix)}</div>
-        <div class="recommend-sub">Envoie ce montant par Mobile Money au numéro :<br/><strong style="color:var(--text);">${esc(cfg.numeroMobileMoney)}</strong></div>
-      </div>
-    </div>
-    <div style="text-align:left;margin-top:16px;">
-      <label class="field-label">Montant payé</label>
-      <input id="payMontant" class="input" type="number" placeholder="Ex: ${prix}" value="${esc(state.payMontant)}"/>
-      <label class="field-label" style="margin-top:12px;">Numéro utilisé pour le paiement</label>
-      <input id="payNumero" class="input" placeholder="Ex: 07 00 00 00 00" value="${esc(state.payNumero)}"/>
-      <label class="field-label" style="margin-top:12px;">Référence de la transaction</label>
-      <input id="payReference" class="input" placeholder="Ex: MP240827.1234" value="${esc(state.payReference)}"/>
-    </div>
-    ${state.payError ? `<div class="login-error">⚠️ ${esc(state.payError)}</div>` : ""}
-    <button id="payConfirmBtn" class="login-btn btn">✅ Confirmer mon paiement</button>
-    <div class="login-hint"><span id="backToRegisterInfoLink" style="color:var(--text-muted);text-decoration:underline;cursor:pointer;">← Retour</span></div>
-  </div>`;
-}
-
-/* ---------- REGISTER : confirmation envoyée ---------- */
-function renderRegisterSent(){
-  return `
-  <div class="login-wrap">
-    <div style="font-size:40px;margin-bottom:10px;">✅</div>
-    <div class="login-title">Demande envoyée !</div>
-    <div class="login-sub" style="margin-bottom:0;">
-      Ta demande a été transmise à S.M. Digital. Ton code d'accès te sera envoyé par WhatsApp
-      dès que ton paiement sera validé — généralement sous quelques heures.
-    </div>
-    <button id="backToLoginFromSentBtn" class="login-btn btn" style="margin-top:20px;">Retour à l'accueil</button>
-  </div>`;
-}
 /* ---------- ADMIN VIEW ---------- */
 function renderAdmin(){
   const clients = state.registry.filter(c=>c.id!=="seed-owner");
-  const cfg = state.config || CONFIG_DEFAUT;
-  const demandesEnAttente = (state.demandes||[]).filter(dd=>dd.statut==="en_attente");
-  const dateAbonnement = state._adminDate || new Date().toISOString().slice(0,10);
+  const dateAbonnement = state._adminDate || todayISO();
   const dateExpPrevue = addDays(dateAbonnement, DUREE_ABONNEMENT_JOURS);
+  const pending = state.registrations || [];
   return `
   <div class="top-bar">
     <span class="top-bar-client">🛡️ Panneau admin — S.M. Digital</span>
     <button id="logoutBtn" class="logout-btn">↩ Quitter</button>
   </div>
 
-  ${demandesEnAttente.length>0 ? `
-  <div class="card" style="border-color:var(--gold);">
-    <div class="card-header">🔔 Demandes en attente (${demandesEnAttente.length})</div>
-    ${demandesEnAttente.map(dd=>{
-      const f = FORMULES[dd.formule]||FORMULES["1"];
-      return `
-      <div class="membre-card">
-        <div class="membre-header">
-          <div class="membre-nom-wrap">
-            <div class="membre-avatar">${esc((dd.nom||"?").trim().charAt(0).toUpperCase())}</div>
-            <div>
-              <div class="membre-nom">${esc(dd.nom||dd.codeExistant||"Renouvellement")}</div>
-              <div style="font-size:11px;color:var(--text-faint);margin-top:2px;">
-                ${dd.type==="renouvellement" ? `Renouvellement · ${esc(dd.codeExistant)}` : `${esc(dd.email||"")} · ${esc(dd.whatsapp||"")}`}
-              </div>
-            </div>
-          </div>
-          <span class="status-badge" style="background:#3a3320;color:var(--yellow);">${f.label}</span>
+  <div class="card">
+    <div class="card-header">📥 Demandes d'inscription en attente${pending.length?`<span class="badge-count">${pending.length}</span>`:""}</div>
+    ${pending.length===0 ? `<div class="empty-hint">Aucune demande en attente.</div>` :
+      pending.map(r=>`
+      <div class="pending-card">
+        <div class="membre-nom">${esc(r.nom)}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.6;">
+          ✉️ ${esc(r.email)}<br/>📱 ${esc(r.whatsapp)}<br/>📅 Demande du ${formatDateCourte(r.date)} · langue : ${r.langue==="en"?"English":"Français"}
         </div>
-        <div class="client-dates-row">
-          <span>Montant : ${formatFCFA(dd.montantPaye)}</span>
-          <span>Réf : ${esc(dd.reference)}</span>
+        <div class="pending-actions">
+          <button class="btn-primary btn validateRegBtn" data-id="${r.id}">✅ Valider &amp; créer le compte</button>
+          <button class="btn-muted btn rejectRegBtn" data-id="${r.id}" style="color:var(--red);">🗑 Rejeter</button>
         </div>
-        <div class="client-dates-row">
-          <span>Numéro utilisé : ${esc(dd.numeroPaiement)}</span>
-        </div>
-        <div class="client-actions-row">
-          <button class="btn-muted btn validerDemandeBtn" data-id="${dd.id}" style="color:var(--green);">✅ Valider</button>
-          <button class="btn-muted btn rejeterDemandeBtn" data-id="${dd.id}" style="color:var(--red);">✕ Rejeter</button>
-        </div>
-      </div>`;
-    }).join("")}
-  </div>` : ""}
+      </div>`).join("")
+    }
+  </div>
 
   <div class="card">
-    <div class="card-header">➕ Ajouter un client abonné manuellement</div>
+    <div class="card-header">➕ Ajouter un client abonné</div>
     <div class="grid-2">
       <div><label class="field-label">Nom du client</label><input id="admNom" class="input" placeholder="Ex: Fatou Diallo" value="${esc(state._admNom||"")}"/></div>
       <div><label class="field-label">Téléphone (mobile money)</label><input id="admTel" class="input" placeholder="Ex: 07 00 00 00 00" value="${esc(state._admTel||"")}"/></div>
@@ -405,19 +404,6 @@ function renderAdmin(){
   </div>
 
   <div class="card">
-    <div class="card-header">💳 Paramètres d'abonnement</div>
-    <div class="grid-2">
-      <div><label class="field-label">Prix 1 mois (FCFA)</label><input id="cfgPrix1" class="input" type="number" value="${esc(cfg.prix1)}"/></div>
-      <div><label class="field-label">Prix 3 mois (FCFA)</label><input id="cfgPrix3" class="input" type="number" value="${esc(cfg.prix3)}"/></div>
-      <div><label class="field-label">Prix 6 mois (FCFA)</label><input id="cfgPrix6" class="input" type="number" value="${esc(cfg.prix6)}"/></div>
-      <div><label class="field-label">Prix 12 mois (FCFA)</label><input id="cfgPrix12" class="input" type="number" value="${esc(cfg.prix12)}"/></div>
-    </div>
-    <label class="field-label" style="margin-top:12px;">Numéro Mobile Money</label>
-    <input id="cfgNumero" class="input" value="${esc(cfg.numeroMobileMoney)}"/>
-    <button id="saveConfigBtn" class="btn-primary btn" style="width:100%;justify-content:center;margin-top:16px;">💾 Enregistrer les paramètres</button>
-  </div>
-
-  <div class="card">
     <div class="card-header">👥 Clients (${clients.length})</div>
     ${clients.length===0 ? `<div class="empty-hint">Aucun client pour l'instant. Ajoute ton premier abonné ci-dessus.</div>` :
       clients.map(c=>{
@@ -432,7 +418,7 @@ function renderAdmin(){
             <div class="membre-nom-wrap">
               <div class="membre-avatar">${esc(c.nom.trim().charAt(0).toUpperCase())}</div>
               <div><div class="membre-nom">${esc(c.nom)}</div>
-                <div style="font-size:11px;color:var(--text-faint);margin-top:2px;">${esc(c.code)}${c.telephone?` · ${esc(c.telephone)}`:""}</div>
+                <div style="font-size:11px;color:var(--text-faint);margin-top:2px;">${esc(c.code)}${c.telephone?` · ${esc(c.telephone)}`:""}${c.email?` · ${esc(c.email)}`:""}</div>
               </div>
             </div>
             <span class="status-badge" style="background:${bg};color:${fg};">${label}</span>
@@ -452,133 +438,213 @@ function renderAdmin(){
   </div>`;
 }
 
-/* ---------- CLIENT APP VIEW ---------- */
+/* ---------- CLIENT APP (pages 2 à 5, onglets en haut) ---------- */
 function renderClientApp(){
   const client = state.currentClient;
+  const jr = joursRestants(client.dateExpiration);
+
+  const tabs = [
+    ["salaire", t("tabSalaire")],
+    ["objectif", t("tabObjectif")],
+    ["ventes", t("tabVentes")],
+    ["tontine", t("tabTontine")]
+  ];
+
+  let content = "";
+  if(state.tab==="salaire") content = renderTabSalaire();
+  else if(state.tab==="objectif") content = renderTabObjectif();
+  else if(state.tab==="ventes") content = renderTabVentes();
+  else content = renderTabTontine();
+
+  return `
+  <div class="top-bar">
+    <span class="top-bar-client">${t("bonjour")}, ${esc(client.nom.split(" ")[0])}</span>
+    <div class="top-bar-right">
+      <span style="font-size:12px;color:${jr<=5?'var(--yellow)':'var(--green)'};">
+        ${jr>=0 ? `${t("abonneJusquau")} ${formatDateCourte(client.dateExpiration)}` : t("abonneExpire")}
+      </span>
+      <button id="logoutBtn" class="logout-btn">${t("deconnexion")}</button>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    ${tabs.map(([key,label])=>`<button class="tab-btn ${state.tab===key?"active":""} btn tabBtn" data-tab="${key}">${label}</button>`).join("")}
+  </div>
+
+  ${content}`;
+}
+
+/* --- Page 2 : Salaire & dépenses (avec archive mensuelle) --- */
+function renderTabSalaire(){
   const d = state.plannerData;
-  const mois = state.moisSelectionne || moisActuelKey();
-  const md = d.moisData[mois] || moisVide();
-  const totalDepenses = md.depenses.reduce((s,x)=>s+(Number(x.montant)||0),0);
-  const resteDisponible = (Number(md.salaire)||0) - totalDepenses;
-  const estMoisActuel = mois===moisActuelKey();
+  const key = monthKeyFromOffset(state.financeMonthOffset);
+  const mois = d.finance[key] || emptyMoisFinance();
+  const totalDepenses = mois.depenses.reduce((s,x)=>s+(Number(x.montant)||0),0);
+  const resteDisponible = (Number(mois.salaire)||0) - totalDepenses;
+  const isCurrent = state.financeMonthOffset===0;
+
+  return `
+  <div class="card">
+    <div class="card-header">${t("salaireHeader")}</div>
+    <div class="month-nav">
+      <button class="month-nav-btn btn" id="monthPrevBtn">◀</button>
+      <div class="month-nav-label">${monthLabel(key)}<span class="month-nav-tag">${isCurrent?"· "+t("enCours"):"· "+t("archive")}</span></div>
+      <button class="month-nav-btn btn" id="monthNextBtn" ${isCurrent?"disabled":""}>▶</button>
+    </div>
+    <label class="field-label">${t("salaireMensuel")}</label>
+    <input id="salaire" class="input" type="number" placeholder="Ex: 150000" value="${esc(mois.salaire)}"/>
+    <label class="field-label" style="margin-top:18px;">${t("depensesFixes")}</label>
+    ${mois.depenses.length===0?`<div class="empty-hint">${t("aucuneDepense")}</div>`:
+      mois.depenses.map(x=>`<div class="row list-row"><span class="list-row-label">${esc(x.nom)}</span><span class="list-row-value">${formatFCFA(x.montant)}</span><button class="icon-btn del delDepense" data-id="${x.id}">🗑</button></div>`).join("")}
+    <div class="add-row">
+      <input id="newDepNom" class="input" style="flex:1.4;" placeholder="${t("nomDepense")}"/>
+      <input id="newDepMontant" class="input" style="flex:1;" type="number" placeholder="${t("montant")}"/>
+      <button id="addDepBtn" class="btn-icon btn">➕</button>
+    </div>
+    <div class="divider"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:13px;color:var(--text-muted);">${t("resteDispo")}</span>
+      <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:${resteDisponible>=0?'var(--green)':'var(--red)'};">${formatFCFA(resteDisponible)}</span>
+    </div>
+  </div>`;
+}
+
+/* --- Page 3 : Objectif --- */
+function renderTabObjectif(){
+  const d = state.plannerData;
   const totalCotise = d.cotisations.reduce((s,x)=>s+(Number(x.montant)||0),0);
   const objMontant = Number(d.objectif.montant)||0;
   const progression = objMontant>0 ? Math.min((totalCotise/objMontant)*100,100) : 0;
   const restant = Math.max(objMontant-totalCotise,0);
   const moisRestants = monthsBetween(new Date().toISOString(), d.objectif.dateLimite);
   const mensualite = moisRestants>0 ? restant/moisRestants : restant;
+
+  return `
+  <div class="hero">
+    <div class="hero-top-row">
+      <div class="hero-label">${t("objectifHeader")}</div>
+      <div class="hero-date-badge">📅 ${formatDateLongue(d.dateDebut)}</div>
+    </div>
+    <div class="hero-title">${d.objectif.nom ? esc(d.objectif.nom) : t("nomObjectif")}</div>
+    ${objMontant>0 ? `
+    <div class="progress-track"><div class="progress-fill" style="width:${progression}%;"></div></div>
+    <div class="hero-stats-row">
+      <div><div class="hero-stat-value">${formatFCFA(totalCotise)}</div><div class="hero-stat-label">${t("cotise")}</div></div>
+      <div class="hero-stat-divider"></div>
+      <div><div class="hero-stat-value">${formatFCFA(restant)}</div><div class="hero-stat-label">${t("restant")}</div></div>
+      <div class="hero-stat-divider"></div>
+      <div><div class="hero-stat-value">${progression.toFixed(0)}%</div><div class="hero-stat-label">${t("atteint")}</div></div>
+    </div>` : ""}
+  </div>
+
+  <div class="card">
+    <label class="field-label">${t("nomObjectif")}</label>
+    <input id="objNom" class="input" placeholder="Ex: Achat terrain, Studio..." value="${esc(d.objectif.nom)}"/>
+    <label class="field-label" style="margin-top:14px;">${t("montantCible")}</label>
+    <input id="objMontant" class="input" type="number" placeholder="Ex: 2000000" value="${esc(d.objectif.montant)}"/>
+    <label class="field-label" style="margin-top:14px;">${t("dateLimite")}</label>
+    <input id="objDate" class="input" type="date" value="${d.objectif.dateLimite}"/>
+    ${objMontant>0 && d.objectif.dateLimite ? `
+    <div class="recommend-box"><div>📈</div><div>
+      <div class="recommend-value">${formatFCFA(mensualite)} ${t("parMois")}</div>
+      <div class="recommend-sub">${state.lang==="en"?`over ${moisRestants>0?moisRestants:"less than one"} `:`à cotiser sur ${moisRestants>0?moisRestants:"moins d'un"} `}${t("moisRestants")}</div>
+    </div></div>` : ""}
+  </div>
+
+  <div class="card">
+    <div class="card-header">${t("cotisationsHeader")}</div>
+    <div class="add-row">
+      <input id="newCotMontant" class="input" style="flex:1;" type="number" placeholder="${t("montantVerse")}"/>
+      <button id="addCotBtn" class="btn-primary btn">${t("ajouter")}</button>
+    </div>
+    ${d.cotisations.length===0?`<div class="empty-hint">${t("aucunVersement")}</div>`:
+      [...d.cotisations].reverse().map(c=>`
+      <div class="row list-row"><span style="font-size:12px;">📅</span><span class="list-row-label">${formatDateCourte(c.date)}</span><span class="list-row-value">${formatFCFA(c.montant)}</span><button class="icon-btn del delCot" data-id="${c.id}">🗑</button></div>`).join("")}
+  </div>`;
+}
+
+/* --- Page 4 : Ventes de marchandises (avec archive par jour) --- */
+function renderTabVentes(){
+  const d = state.plannerData;
+  const date = state.venteDate;
+  const jour = d.ventes[date] || emptyJourVente();
+  const total = jour.objets.reduce((s,x)=>s+(Number(x.prix)||0)*(Number(x.qte)||0),0);
+  const archiveDates = Object.keys(d.ventes).filter(k=>d.ventes[k].objets && d.ventes[k].objets.length>0).sort((a,b)=>b<a?-1:1);
+
+  return `
+  <div class="card">
+    <div class="card-header">${t("ventesHeader")}</div>
+    <label class="field-label">${t("dateVente")}</label>
+    <input id="venteDateInput" class="input" type="date" value="${date}"/>
+
+    <label class="field-label" style="margin-top:18px;">${t("article")}</label>
+    ${jour.objets.length===0?`<div class="empty-hint">${t("aucuneVente")}</div>`:
+      jour.objets.map(o=>`
+      <div class="article-row">
+        <span class="list-row-label" style="flex:1.4;">${esc(o.nom)}</span>
+        <span style="flex:1;text-align:right;color:var(--text-muted);">${o.qte} × ${formatFCFA(o.prix)}</span>
+        <span class="list-row-value" style="min-width:90px;text-align:right;">${formatFCFA((Number(o.prix)||0)*(Number(o.qte)||0))}</span>
+        <button class="icon-btn del delArticle" data-id="${o.id}">🗑</button>
+      </div>`).join("")}
+    <div class="add-row" style="flex-wrap:wrap;">
+      <input id="newArtNom" class="input" style="flex:1.6;min-width:120px;" placeholder="${t("article")}"/>
+      <input id="newArtPrix" class="input" style="flex:1;min-width:90px;" type="number" placeholder="${t("prixUnitaire")}"/>
+      <input id="newArtQte" class="input" style="flex:.7;min-width:70px;" type="number" placeholder="${t("quantite")}" value="1"/>
+      <button id="addArtBtn" class="btn-icon btn">➕</button>
+    </div>
+
+    <div class="divider"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <span style="font-size:13px;color:var(--text-muted);">${t("totalJour")}</span>
+      <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:var(--gold-light);">${formatFCFA(total)}</span>
+    </div>
+    <button id="saveVenteBtn" class="btn-primary btn" style="width:100%;justify-content:center;">${t("sauvegarder")}</button>
+  </div>
+
+  <div class="card">
+    <div class="card-header">📦 ${t("archivesVentes")}</div>
+    ${archiveDates.length===0?`<div class="empty-hint">${t("aucuneVente")}</div>`:
+      archiveDates.map(k=>{
+        const tot = d.ventes[k].objets.reduce((s,x)=>s+(Number(x.prix)||0)*(Number(x.qte)||0),0);
+        return `<div class="archive-item loadVenteDate" data-date="${k}">
+          <span class="archive-item-label">${formatDateCourte(k)}${k===date?" •":""}</span>
+          <span class="list-row-value">${formatFCFA(tot)}</span>
+        </div>`;
+      }).join("")}
+  </div>`;
+}
+
+/* --- Page 5 : Tontine --- */
+function renderTabTontine(){
+  const d = state.plannerData;
   const fraisPct = Number(d.tontine.fraisRetraitPct)||0;
   const valeurMaxT = Number(d.tontine.valeurMax)||0;
   const totalTontine = d.tontine.membres.reduce((s,m)=>s+m.depots.reduce((s2,x)=>s2+(Number(x.montant)||0),0),0);
   const progT = valeurMaxT>0 ? Math.min((totalTontine/valeurMaxT)*100,100) : 0;
-  const jr = joursRestants(client.dateExpiration);
 
   return `
-  <div class="top-bar">
-    <span class="top-bar-client">Bonjour, ${esc(client.nom.split(" ")[0])}</span>
-    <div class="top-bar-right">
-      <span style="font-size:12px;color:${jr<=5?'var(--yellow)':'var(--green)'};">
-        ${jr>=0 ? `Abonnement valide jusqu'au ${formatDateCourte(client.dateExpiration)}` : "Abonnement expiré"}
-      </span>
-      <button id="logoutBtn" class="logout-btn">↩ Se déconnecter</button>
-    </div>
-  </div>
-
-  <div class="hero">
-    <div class="hero-top-row">
-      <div class="hero-label">PLANIFICATEUR FINANCIER</div>
-      <div class="hero-date-badge">📅 Débuté le ${formatDateLongue(d.dateDebut)}</div>
-    </div>
-    <div class="hero-title">${d.objectif.nom ? esc(d.objectif.nom) : "Définis ton prochain objectif"}</div>
-    <div class="date-field-row">
-      <label class="field-label" style="margin:0;">Date de début de la planification</label>
-      <input id="dateDebut" class="input-date-inline" type="date" value="${d.dateDebut}"/>
-    </div>
-    ${objMontant>0 ? `
-    <div class="progress-track"><div class="progress-fill" style="width:${progression}%;"></div></div>
-    <div class="hero-stats-row">
-      <div><div class="hero-stat-value">${formatFCFA(totalCotise)}</div><div class="hero-stat-label">cotisé</div></div>
-      <div class="hero-stat-divider"></div>
-      <div><div class="hero-stat-value">${formatFCFA(restant)}</div><div class="hero-stat-label">restant</div></div>
-      <div class="hero-stat-divider"></div>
-      <div><div class="hero-stat-value">${progression.toFixed(0)}%</div><div class="hero-stat-label">atteint</div></div>
-    </div>` : ""}
-  </div>
-
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-header">💰 Salaire &amp; dépenses</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg);border:1px solid var(--input-border);border-radius:10px;padding:8px 10px;margin-bottom:16px;">
-        <button id="moisPrevBtn" class="icon-btn" style="font-size:16px;">◀</button>
-        <span style="font-weight:600;font-size:14px;">${formatMoisLabel(mois)}${estMoisActuel?" <span style=\"color:var(--gold);font-size:11px;\">· en cours</span>":""}</span>
-        <button id="moisNextBtn" class="icon-btn" style="font-size:16px;">▶</button>
-      </div>
-      <label class="field-label">Salaire mensuel</label>
-      <input id="salaire" class="input" type="number" placeholder="Ex: 150000" value="${esc(md.salaire)}"/>
-      <label class="field-label" style="margin-top:18px;">Dépenses fixes</label>
-      ${md.depenses.length===0?`<div class="empty-hint">Aucune dépense ajoutée pour ${formatMoisLabel(mois)}.</div>`:
-        md.depenses.map(x=>`<div class="row list-row"><span class="list-row-label">${esc(x.nom)}</span><span class="list-row-value">${formatFCFA(x.montant)}</span><button class="icon-btn del delDepense" data-id="${x.id}">🗑</button></div>`).join("")}
-      <div class="add-row">
-        <input id="newDepNom" class="input" style="flex:1.4;" placeholder="Nom (ex: Loyer)"/>
-        <input id="newDepMontant" class="input" style="flex:1;" type="number" placeholder="Montant"/>
-        <button id="addDepBtn" class="btn-icon btn">➕</button>
-      </div>
-      <div class="divider"></div>
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:13px;color:var(--text-muted);">Reste disponible</span>
-        <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:${resteDisponible>=0?'var(--green)':'var(--red)'};">${formatFCFA(resteDisponible)}</span>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header">🎯 Ton objectif</div>
-      <label class="field-label">Nom de l'objectif</label>
-      <input id="objNom" class="input" placeholder="Ex: Achat terrain, Studio..." value="${esc(d.objectif.nom)}"/>
-      <label class="field-label" style="margin-top:14px;">Montant cible</label>
-      <input id="objMontant" class="input" type="number" placeholder="Ex: 2000000" value="${esc(d.objectif.montant)}"/>
-      <label class="field-label" style="margin-top:14px;">Date limite</label>
-      <input id="objDate" class="input" type="date" value="${d.objectif.dateLimite}"/>
-      ${objMontant>0 && d.objectif.dateLimite ? `
-      <div class="recommend-box"><div>📈</div><div>
-        <div class="recommend-value">${formatFCFA(mensualite)} / mois</div>
-        <div class="recommend-sub">à cotiser sur ${moisRestants>0?moisRestants:"moins d'un"} mois pour atteindre ton objectif à temps</div>
-      </div></div>` : ""}
-    </div>
-  </div>
-
   <div class="card">
-    <div class="card-header">🐷 Suivi des cotisations</div>
-    <div class="add-row">
-      <input id="newCotMontant" class="input" style="flex:1;" type="number" placeholder="Montant versé aujourd'hui"/>
-      <button id="addCotBtn" class="btn-primary btn">➕ Ajouter</button>
-    </div>
-    ${d.cotisations.length===0?`<div class="empty-hint">Aucun versement enregistré.</div>`:
-      [...d.cotisations].reverse().map(c=>`
-      <div class="row list-row"><span style="font-size:12px;">📅</span><span class="list-row-label">${formatDateCourte(c.date)}</span><span class="list-row-value">${formatFCFA(c.montant)}</span><button class="icon-btn del delCot" data-id="${c.id}">🗑</button></div>`).join("")}
-  </div>
-
-  <div class="card">
-    <div class="card-header">👨‍👩‍👧‍👦 Tontine familiale</div>
+    <div class="card-header">${t("tontineHeader")}</div>
     <div class="grid-2" style="grid-template-columns:1fr 1fr 1fr;">
-      <div><label class="field-label">Nom de la tontine</label><input id="tontNom" class="input" placeholder="Ex: Tontine Sangaré" value="${esc(d.tontine.nom)}"/></div>
-      <div><label class="field-label">Valeur maximale</label><input id="tontMax" class="input" type="number" placeholder="Ex: 1000000" value="${esc(d.tontine.valeurMax)}"/></div>
-      <div><label class="field-label">Frais retrait (%)</label><input id="tontFrais" class="input" type="number" placeholder="Ex: 2" value="${esc(d.tontine.fraisRetraitPct)}"/></div>
+      <div><label class="field-label">${t("nomTontine")}</label><input id="tontNom" class="input" placeholder="Ex: Tontine Sangaré" value="${esc(d.tontine.nom)}"/></div>
+      <div><label class="field-label">${t("valeurMax")}</label><input id="tontMax" class="input" type="number" placeholder="Ex: 1000000" value="${esc(d.tontine.valeurMax)}"/></div>
+      <div><label class="field-label">${t("fraisRetrait")}</label><input id="tontFrais" class="input" type="number" placeholder="Ex: 2" value="${esc(d.tontine.fraisRetraitPct)}"/></div>
     </div>
     ${valeurMaxT>0?`
     <div style="margin-top:18px;">
       <div class="progress-track-dark"><div class="progress-fill-green" style="width:${progT}%;"></div></div>
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-top:10px;font-size:13px;color:var(--text-muted);">
-        <span>Somme totale collectée : <strong style="color:var(--text);">${formatFCFA(totalTontine)}</strong></span>
-        <span>${progT.toFixed(0)}% de l'objectif</span>
+        <span>${t("collecte")} : <strong style="color:var(--text);">${formatFCFA(totalTontine)}</strong></span>
+        <span>${progT.toFixed(0)}%</span>
       </div>
     </div>`:""}
     <div class="divider"></div>
-    <label class="field-label">Ajouter un membre</label>
+    <label class="field-label">${t("ajouterMembre")}</label>
     <div class="add-row">
-      <input id="newMembreNom" class="input" style="flex:1;" placeholder="Nom du membre"/>
-      <button id="addMembreBtn" class="btn-primary btn">➕ Ajouter</button>
+      <input id="newMembreNom" class="input" style="flex:1;" placeholder="${t("nomMembre")}"/>
+      <button id="addMembreBtn" class="btn-primary btn">${t("ajouter")}</button>
     </div>
-    ${d.tontine.membres.length===0?`<div class="empty-hint">Aucun membre pour l'instant.</div>`:
+    ${d.tontine.membres.length===0?`<div class="empty-hint">${t("aucunMembre")}</div>`:
       d.tontine.membres.map(m=>{
         const totalM = m.depots.reduce((s,x)=>s+(Number(x.montant)||0),0);
         return `<div class="membre-card">
@@ -593,7 +659,7 @@ function renderClientApp(){
             }).join("")}
           </div>`:""}
           <div class="add-row">
-            <input class="input depotInput" data-membre="${m.id}" type="number" placeholder="Montant du dépôt" style="flex:1;"/>
+            <input class="input depotInput" data-membre="${m.id}" type="number" placeholder="${t("montantDepot")}" style="flex:1;"/>
             <button class="btn-icon btn addDepotBtn" data-membre="${m.id}">➕</button>
           </div>
         </div>`;
@@ -603,44 +669,20 @@ function renderClientApp(){
 
 /* ---------- Events ---------- */
 function attachEvents(){
-  if (state.view==="login"){
+  if (state.view==="home"){
+    document.querySelectorAll(".lang-btn").forEach(b=>b.addEventListener("click",()=>{ state.lang=b.dataset.lang; render(); }));
+    document.querySelectorAll(".home-mode-btn").forEach(b=>b.addEventListener("click",()=>{ state.homeMode=b.dataset.mode; state.loginError=""; render(); }));
+
     const ci=document.getElementById("codeInput");
     ci?.addEventListener("input",e=>state.codeInput=e.target.value);
     ci?.addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
     document.getElementById("loginBtn")?.addEventListener("click",doLogin);
-    document.getElementById("goRegisterLink")?.addEventListener("click", async ()=>{
-      state.regType="inscription"; state.config = await getConfig(); state.view="registerInfo"; render();
-    });
-    document.getElementById("renewFromLoginBtn")?.addEventListener("click", async ()=>{
-      state.regType="renouvellement"; state.config = await getConfig(); state.view="registerInfo"; render();
-    });
-  }
-  if (state.view==="registerInfo"){
-    document.getElementById("regNom")?.addEventListener("input",e=>state.regNom=e.target.value);
-    document.getElementById("regEmail")?.addEventListener("input",e=>state.regEmail=e.target.value);
-    document.getElementById("regWhatsapp")?.addEventListener("input",e=>state.regWhatsapp=e.target.value);
-    document.getElementById("regCodeExistant")?.addEventListener("input",e=>state.loginExpiredCode=e.target.value);
-    document.querySelectorAll(".formuleRadio").forEach(r=>r.addEventListener("change",e=>{ state.regFormule=e.target.value; render(); }));
-    document.getElementById("regContinueBtn")?.addEventListener("click",()=>{
-      if(state.regType!=="renouvellement" && !state.regNom.trim()){ return; }
-      if(state.regType==="renouvellement" && !(state.loginExpiredCode||"").trim()){ return; }
-      state.view="registerPayment"; render();
-    });
-    document.getElementById("backToLoginLink")?.addEventListener("click",()=>{ state.view="login"; render(); });
-  }
-  if (state.view==="registerPayment"){
-    document.getElementById("payMontant")?.addEventListener("input",e=>state.payMontant=e.target.value);
-    document.getElementById("payNumero")?.addEventListener("input",e=>state.payNumero=e.target.value);
-    document.getElementById("payReference")?.addEventListener("input",e=>state.payReference=e.target.value);
-    document.getElementById("payConfirmBtn")?.addEventListener("click",soumettrePaiement);
-    document.getElementById("backToRegisterInfoLink")?.addEventListener("click",()=>{ state.view="registerInfo"; render(); });
-  }
-  if (state.view==="registerSent"){
-    document.getElementById("backToLoginFromSentBtn")?.addEventListener("click",()=>{
-      state = { ...state, view:"login", codeInput:"", loginError:"", loginExpiredCode:"",
-        regNom:"", regEmail:"", regWhatsapp:"", regFormule:"1", payMontant:"", payNumero:"", payReference:"", payError:"" };
-      render();
-    });
+
+    document.getElementById("sgNom")?.addEventListener("input",e=>state._sgNom=e.target.value);
+    document.getElementById("sgEmail")?.addEventListener("input",e=>state._sgEmail=e.target.value);
+    document.getElementById("sgWhatsapp")?.addEventListener("input",e=>state._sgWhatsapp=e.target.value);
+    document.getElementById("signupBtn")?.addEventListener("click",doSignup);
+    document.getElementById("signupAgainBtn")?.addEventListener("click",()=>{ state.signupSuccess=false; state._sgNom=""; state._sgEmail=""; state._sgWhatsapp=""; render(); });
   }
   if (state.view==="admin"){
     document.getElementById("logoutBtn")?.addEventListener("click",doLogout);
@@ -651,39 +693,43 @@ function attachEvents(){
     document.querySelectorAll(".renewBtn").forEach(b=>b.addEventListener("click",()=>renewClient(b.dataset.id)));
     document.querySelectorAll(".toggleBtn").forEach(b=>b.addEventListener("click",()=>toggleClient(b.dataset.id)));
     document.querySelectorAll(".delBtn").forEach(b=>b.addEventListener("click",()=>deleteClient(b.dataset.id)));
-    document.querySelectorAll(".validerDemandeBtn").forEach(b=>b.addEventListener("click",()=>validerDemande(b.dataset.id)));
-    document.querySelectorAll(".rejeterDemandeBtn").forEach(b=>b.addEventListener("click",()=>rejeterDemande(b.dataset.id)));
-    document.getElementById("cfgPrix1")?.addEventListener("input",e=>{ state.config=state.config||{...CONFIG_DEFAUT}; state.config.prix1=e.target.value; });
-    document.getElementById("cfgPrix3")?.addEventListener("input",e=>{ state.config=state.config||{...CONFIG_DEFAUT}; state.config.prix3=e.target.value; });
-    document.getElementById("cfgPrix6")?.addEventListener("input",e=>{ state.config=state.config||{...CONFIG_DEFAUT}; state.config.prix6=e.target.value; });
-    document.getElementById("cfgPrix12")?.addEventListener("input",e=>{ state.config=state.config||{...CONFIG_DEFAUT}; state.config.prix12=e.target.value; });
-    document.getElementById("cfgNumero")?.addEventListener("input",e=>{ state.config=state.config||{...CONFIG_DEFAUT}; state.config.numeroMobileMoney=e.target.value; });
-    document.getElementById("saveConfigBtn")?.addEventListener("click",async ()=>{
-      await saveConfig(state.config||CONFIG_DEFAUT);
-      alert("Paramètres enregistrés !");
-    });
+    document.querySelectorAll(".validateRegBtn").forEach(b=>b.addEventListener("click",()=>validateRegistration(b.dataset.id)));
+    document.querySelectorAll(".rejectRegBtn").forEach(b=>b.addEventListener("click",()=>rejectRegistration(b.dataset.id)));
   }
   if (state.view==="app"){
     document.getElementById("logoutBtn")?.addEventListener("click",doLogout);
-    document.getElementById("moisPrevBtn")?.addEventListener("click",()=>{ state.moisSelectionne=decalerMois(state.moisSelectionne||moisActuelKey(),-1); render(); });
-    document.getElementById("moisNextBtn")?.addEventListener("click",()=>{ state.moisSelectionne=decalerMois(state.moisSelectionne||moisActuelKey(),1); render(); });
-    bindDebounced("dateDebut", v=>state.plannerData.dateDebut=v);
-    bindDebounced("salaire", v=>{ ensureMois(); state.plannerData.moisData[state.moisSelectionne].salaire=v; });
-    bindDebounced("objNom", v=>state.plannerData.objectif.nom=v);
-    bindDebounced("objMontant", v=>state.plannerData.objectif.montant=v);
-    bindDebounced("objDate", v=>state.plannerData.objectif.dateLimite=v);
-    bindDebounced("tontNom", v=>state.plannerData.tontine.nom=v);
-    bindDebounced("tontMax", v=>state.plannerData.tontine.valeurMax=v);
-    bindDebounced("tontFrais", v=>state.plannerData.tontine.fraisRetraitPct=v);
+    document.querySelectorAll(".tabBtn").forEach(b=>b.addEventListener("click",()=>{ state.tab=b.dataset.tab; render(); }));
 
-    document.getElementById("addDepBtn")?.addEventListener("click",addDepense);
-    document.querySelectorAll(".delDepense").forEach(b=>b.addEventListener("click",()=>removeItem("depenses",b.dataset.id)));
-    document.getElementById("addCotBtn")?.addEventListener("click",addCotisation);
-    document.querySelectorAll(".delCot").forEach(b=>b.addEventListener("click",()=>removeItem("cotisations",b.dataset.id)));
-    document.getElementById("addMembreBtn")?.addEventListener("click",addMembre);
-    document.querySelectorAll(".delMembre").forEach(b=>b.addEventListener("click",()=>removeMembre(b.dataset.id)));
-    document.querySelectorAll(".addDepotBtn").forEach(b=>b.addEventListener("click",()=>addDepot(b.dataset.membre)));
-    document.querySelectorAll(".delDepot").forEach(b=>b.addEventListener("click",()=>removeDepot(b.dataset.membre,b.dataset.depot)));
+    if(state.tab==="salaire"){
+      bindDebounced("salaire", v=>{ const key=monthKeyFromOffset(state.financeMonthOffset); if(!state.plannerData.finance[key]) state.plannerData.finance[key]=emptyMoisFinance(); state.plannerData.finance[key].salaire=v; });
+      document.getElementById("monthPrevBtn")?.addEventListener("click",()=>{ state.financeMonthOffset--; render(); });
+      document.getElementById("monthNextBtn")?.addEventListener("click",()=>{ if(state.financeMonthOffset<0){ state.financeMonthOffset++; render(); } });
+      document.getElementById("addDepBtn")?.addEventListener("click",addDepense);
+      document.querySelectorAll(".delDepense").forEach(b=>b.addEventListener("click",()=>removeDepense(b.dataset.id)));
+    }
+    if(state.tab==="objectif"){
+      bindDebounced("objNom", v=>state.plannerData.objectif.nom=v);
+      bindDebounced("objMontant", v=>state.plannerData.objectif.montant=v);
+      bindDebounced("objDate", v=>state.plannerData.objectif.dateLimite=v);
+      document.getElementById("addCotBtn")?.addEventListener("click",addCotisation);
+      document.querySelectorAll(".delCot").forEach(b=>b.addEventListener("click",()=>removeItem("cotisations",b.dataset.id)));
+    }
+    if(state.tab==="ventes"){
+      document.getElementById("venteDateInput")?.addEventListener("change",e=>{ state.venteDate=e.target.value; render(); });
+      document.getElementById("addArtBtn")?.addEventListener("click",addArticleVente);
+      document.querySelectorAll(".delArticle").forEach(b=>b.addEventListener("click",()=>removeArticleVente(b.dataset.id)));
+      document.getElementById("saveVenteBtn")?.addEventListener("click",()=>persistPlanner());
+      document.querySelectorAll(".loadVenteDate").forEach(b=>b.addEventListener("click",()=>{ state.venteDate=b.dataset.date; render(); }));
+    }
+    if(state.tab==="tontine"){
+      bindDebounced("tontNom", v=>state.plannerData.tontine.nom=v);
+      bindDebounced("tontMax", v=>state.plannerData.tontine.valeurMax=v);
+      bindDebounced("tontFrais", v=>state.plannerData.tontine.fraisRetraitPct=v);
+      document.getElementById("addMembreBtn")?.addEventListener("click",addMembre);
+      document.querySelectorAll(".delMembre").forEach(b=>b.addEventListener("click",()=>removeMembre(b.dataset.id)));
+      document.querySelectorAll(".addDepotBtn").forEach(b=>b.addEventListener("click",()=>addDepot(b.dataset.membre)));
+      document.querySelectorAll(".delDepot").forEach(b=>b.addEventListener("click",()=>removeDepot(b.dataset.membre,b.dataset.depot)));
+    }
   }
 }
 function bindDebounced(id,setter){
@@ -691,15 +737,14 @@ function bindDebounced(id,setter){
   let t; el.addEventListener("input",e=>{ setter(e.target.value); clearTimeout(t); t=setTimeout(()=>persistPlanner(false),500); });
 }
 
-/* ---------- Actions ---------- */
+/* ---------- Actions : accueil ---------- */
 async function doLogin(){
-  state.loginError=""; state.loginExpiredCode="";
+  state.loginError="";
   const code=(state.codeInput||"").trim().toUpperCase();
   if(!code) return;
   if(code===ADMIN_CODE){
     state.registry = await getRegistry();
-    state.demandes = await getDemandes();
-    state.config = await getConfig();
+    state.registrations = await getRegistrations();
     state.view="admin"; render(); return;
   }
   const registry = await getRegistry();
@@ -707,93 +752,52 @@ async function doLogin(){
   let client = registry.find(c=>c.code.toUpperCase()===code);
   if(code===OWNER_CODE && !client){
     client = { id:"seed-owner", nom:"Mario (Propriétaire)", telephone:"", code:OWNER_CODE,
-      dateAbonnement:new Date().toISOString().slice(0,10), dateExpiration:"2099-12-31", actif:true };
+      dateAbonnement:todayISO(), dateExpiration:"2099-12-31", actif:true };
     await saveClient(client);
   }
-  if(!client){ state.loginError="Code d'accès invalide. Vérifie et réessaie."; render(); return; }
-  if(!client.actif){ state.loginError="Cet abonnement a été désactivé. Contacte S.M. Digital."; render(); return; }
-  if(joursRestants(client.dateExpiration)<0){
-    state.loginError="Ton abonnement a expiré. Renouvelle-le pour continuer.";
-    state.loginExpiredCode=code;
-    render(); return;
-  }
+  if(!client){ state.loginError = state.lang==="en" ? "Invalid access code. Check and try again." : "Code d'accès invalide. Vérifie et réessaie."; render(); return; }
+  if(!client.actif){ state.loginError = state.lang==="en" ? "This subscription has been disabled. Contact S.M. Digital." : "Cet abonnement a été désactivé. Contacte S.M. Digital."; render(); return; }
+  if(joursRestants(client.dateExpiration)<0){ state.loginError = state.lang==="en" ? "Your subscription has expired. Renew it to continue." : "Ton abonnement a expiré. Renouvelle-le pour continuer."; render(); return; }
   state.currentClient=client;
   state.plannerData = await getPlannerData(client.code);
-  state.moisSelectionne = moisActuelKey();
+  state.tab="salaire"; state.financeMonthOffset=0; state.venteDate=todayISO();
   state.view="app"; render();
 }
-function doLogout(){ state={view:"login",codeInput:"",loginError:"",loginExpiredCode:"",currentClient:null,registry:[],plannerData:null,moisSelectionne:null,config:null,demandes:[],regType:"inscription",regNom:"",regEmail:"",regWhatsapp:"",regFormule:"1",payMontant:"",payNumero:"",payReference:"",payError:""}; render(); }
-
-async function soumettrePaiement(){
-  state.payError="";
-  const montant = Number(state.payMontant);
-  if(!montant){ state.payError="Indique le montant payé."; render(); return; }
-  if(!(state.payNumero||"").trim()){ state.payError="Indique le numéro utilisé pour le paiement."; render(); return; }
-  if(!(state.payReference||"").trim()){ state.payError="Indique la référence de la transaction."; render(); return; }
-  const demande = {
-    id: uid(),
-    type: state.regType,
-    nom: state.regNom.trim(),
-    email: state.regEmail.trim(),
-    whatsapp: state.regWhatsapp.trim(),
-    codeExistant: (state.loginExpiredCode||"").trim().toUpperCase(),
-    formule: state.regFormule,
-    montantPaye: montant,
-    numeroPaiement: state.payNumero.trim(),
-    reference: state.payReference.trim(),
-    dateCreation: new Date().toISOString(),
-    statut: "en_attente",
-  };
-  await saveDemande(demande);
-  state.view="registerSent"; render();
+function doLogout(){
+  state={ lang:state.lang, view:"home", homeMode:"login", codeInput:"", loginError:"",
+    currentClient:null, registry:[], plannerData:null, signupSuccess:false,
+    _sgNom:"", _sgEmail:"", _sgWhatsapp:"", registrations:[],
+    tab:"salaire", financeMonthOffset:0, venteDate:todayISO() };
+  render();
 }
 
-async function validerDemande(id){
-  const dd = (state.demandes||[]).find(x=>x.id===id); if(!dd) return;
-  const f = FORMULES[dd.formule]||FORMULES["1"];
-  const jours = f.mois*30;
-  if(dd.type==="renouvellement"){
-    const registry = await getRegistry();
-    const c = registry.find(x=>x.code.toUpperCase()===(dd.codeExistant||"").toUpperCase());
-    if(c){
-      const base = joursRestants(c.dateExpiration)>0 ? c.dateExpiration : new Date().toISOString().slice(0,10);
-      c.dateExpiration = addDays(base, jours); c.actif=true;
-      await saveClient(c);
-    }
-  } else {
-    const dateAbonnement = new Date().toISOString().slice(0,10);
-    const client = {
-      id: uid(), nom: dd.nom, telephone: dd.whatsapp, email: dd.email,
-      code: genererCode(dd.nom), dateAbonnement, dateExpiration: addDays(dateAbonnement, jours), actif:true
-    };
-    await saveClient(client);
+async function doSignup(){
+  state.loginError="";
+  const nom=(state._sgNom||"").trim();
+  const email=(state._sgEmail||"").trim();
+  const whatsapp=(state._sgWhatsapp||"").trim();
+  if(!nom || !email || !whatsapp){
+    state.loginError = state.lang==="en" ? "Please fill in all fields." : "Merci de remplir tous les champs.";
+    render(); return;
   }
-  dd.statut="validee";
-  await saveDemande(dd);
-  state.registry = await getRegistry();
-  state.demandes = await getDemandes();
-  render();
-}
-async function rejeterDemande(id){
-  const dd = (state.demandes||[]).find(x=>x.id===id); if(!dd) return;
-  dd.statut="rejetee";
-  await saveDemande(dd);
-  state.demandes = await getDemandes();
-  render();
+  const reg = { id:uid(), nom, email, whatsapp, langue:state.lang, date:todayISO(), statut:"attente" };
+  await saveRegistration(reg);
+  state.signupSuccess=true; render();
 }
 
+/* ---------- Actions : admin ---------- */
 async function addClient(){
   const nom=(state._admNom||"").trim(); if(!nom) return;
-  const dateAbonnement = state._adminDate || new Date().toISOString().slice(0,10);
+  const dateAbonnement = state._adminDate || todayISO();
   const client={ id:uid(), nom, telephone:(state._admTel||"").trim(), code:genererCode(nom),
     dateAbonnement, dateExpiration: addDays(dateAbonnement,DUREE_ABONNEMENT_JOURS), actif:true };
   await saveClient(client);
-  state._admNom=""; state._admTel=""; state._adminDate=new Date().toISOString().slice(0,10);
+  state._admNom=""; state._admTel=""; state._adminDate=todayISO();
   state.registry = await getRegistry(); render();
 }
 async function renewClient(id){
   const c=state.registry.find(x=>x.id===id); if(!c) return;
-  const base = joursRestants(c.dateExpiration)>0 ? c.dateExpiration : new Date().toISOString().slice(0,10);
+  const base = joursRestants(c.dateExpiration)>0 ? c.dateExpiration : todayISO();
   c.dateExpiration = addDays(base, DUREE_ABONNEMENT_JOURS); c.actif=true;
   await saveClient(c); state.registry = await getRegistry(); render();
 }
@@ -804,13 +808,24 @@ async function toggleClient(id){
 async function deleteClient(id){
   await deleteClientDoc(id); state.registry = await getRegistry(); render();
 }
-
-function ensureMois(){
-  const mois = state.moisSelectionne || moisActuelKey();
-  if(!state.plannerData.moisData) state.plannerData.moisData = {};
-  if(!state.plannerData.moisData[mois]) state.plannerData.moisData[mois] = moisVide();
-  state.moisSelectionne = mois;
+async function validateRegistration(id){
+  const reg = state.registrations.find(r=>r.id===id); if(!reg) return;
+  const dateAbonnement = todayISO();
+  const client={ id:uid(), nom:reg.nom, telephone:reg.whatsapp, email:reg.email, code:genererCode(reg.nom),
+    dateAbonnement, dateExpiration: addDays(dateAbonnement,DUREE_ABONNEMENT_JOURS), actif:true };
+  await saveClient(client);
+  await deleteRegistrationDoc(id);
+  state.registry = await getRegistry();
+  state.registrations = await getRegistrations();
+  render();
 }
+async function rejectRegistration(id){
+  await deleteRegistrationDoc(id);
+  state.registrations = await getRegistrations();
+  render();
+}
+
+/* ---------- Actions : espace client ---------- */
 async function persistPlanner(rerender=true){
   await savePlannerData(state.currentClient.code, state.plannerData);
   if(rerender) render();
@@ -819,8 +834,15 @@ async function addDepense(){
   const nom=document.getElementById("newDepNom").value.trim();
   const montant=Number(document.getElementById("newDepMontant").value);
   if(!nom||!montant) return;
-  ensureMois();
-  state.plannerData.moisData[state.moisSelectionne].depenses.push({id:uid(),nom,montant});
+  const key=monthKeyFromOffset(state.financeMonthOffset);
+  if(!state.plannerData.finance[key]) state.plannerData.finance[key]=emptyMoisFinance();
+  state.plannerData.finance[key].depenses.push({id:uid(),nom,montant});
+  await persistPlanner();
+}
+async function removeDepense(id){
+  const key=monthKeyFromOffset(state.financeMonthOffset);
+  if(!state.plannerData.finance[key]) return;
+  state.plannerData.finance[key].depenses = state.plannerData.finance[key].depenses.filter(x=>x.id!==id);
   await persistPlanner();
 }
 async function addCotisation(){
@@ -830,13 +852,23 @@ async function addCotisation(){
   await persistPlanner();
 }
 async function removeItem(key,id){
-  if(key==="depenses"){
-    ensureMois();
-    state.plannerData.moisData[state.moisSelectionne].depenses =
-      state.plannerData.moisData[state.moisSelectionne].depenses.filter(x=>x.id!==id);
-  } else {
-    state.plannerData[key]=state.plannerData[key].filter(x=>x.id!==id);
-  }
+  state.plannerData[key]=state.plannerData[key].filter(x=>x.id!==id);
+  await persistPlanner();
+}
+async function addArticleVente(){
+  const nom=document.getElementById("newArtNom").value.trim();
+  const prix=Number(document.getElementById("newArtPrix").value);
+  const qte=Number(document.getElementById("newArtQte").value)||1;
+  if(!nom||!prix) return;
+  const date=state.venteDate;
+  if(!state.plannerData.ventes[date]) state.plannerData.ventes[date]=emptyJourVente();
+  state.plannerData.ventes[date].objets.push({id:uid(),nom,prix,qte});
+  await persistPlanner();
+}
+async function removeArticleVente(id){
+  const date=state.venteDate;
+  if(!state.plannerData.ventes[date]) return;
+  state.plannerData.ventes[date].objets = state.plannerData.ventes[date].objets.filter(x=>x.id!==id);
   await persistPlanner();
 }
 async function addMembre(){
@@ -865,3 +897,4 @@ render();
 </script>
 </body>
 </html>
+'mis
