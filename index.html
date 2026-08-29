@@ -171,7 +171,12 @@ const T = {
     fraisRetrait:"Frais retrait (%)", collecte:"Somme totale collectée", ajouterMembre:"Ajouter un membre",
     nomMembre:"Nom du membre", aucunMembre:"Aucun membre pour l'instant.", montantDepot:"Montant du dépôt",
     bonjour:"Bonjour", abonneJusquau:"Abonnement valide jusqu'au", abonneExpire:"Abonnement expiré",
-    deconnexion:"↩ Se déconnecter"
+    deconnexion:"↩ Se déconnecter",
+    tontineDateDebut:"Date de début", tontineDuree:"Durée (mois)", tontineDateFin:"Date de fin prévue",
+    ramassageHeader:"📅 Ramassage mensuel", quiRamasse:"Qui ramasse ce mois ?", montantCollecte:"Montant collecté",
+    sauvegarderMois:"💾 Sauvegarder ce mois", archivesTontine:"Archives des ramassages", aucunRamassage:"Aucun ramassage enregistré.",
+    choisirMembre:"— Choisir un membre —", archivesSalaire:"Archives des mois", sauvegarderSalaire:"💾 Sauvegarder ce mois",
+    enregistre:"✅ Enregistré"
   },
   en:{
     appBadge:"S.M. DIGITAL", appTitle:"Financial planner & tontine",
@@ -199,7 +204,12 @@ const T = {
     fraisRetrait:"Withdrawal fee (%)", collecte:"Total collected", ajouterMembre:"Add a member",
     nomMembre:"Member name", aucunMembre:"No member yet.", montantDepot:"Deposit amount",
     bonjour:"Hello", abonneJusquau:"Subscription valid until", abonneExpire:"Subscription expired",
-    deconnexion:"↩ Log out"
+    deconnexion:"↩ Log out",
+    tontineDateDebut:"Start date", tontineDuree:"Duration (months)", tontineDateFin:"Expected end date",
+    ramassageHeader:"📅 Monthly collection", quiRamasse:"Who collects this month?", montantCollecte:"Amount collected",
+    sauvegarderMois:"💾 Save this month", archivesTontine:"Collection archive", aucunRamassage:"No collection recorded yet.",
+    choisirMembre:"— Choose a member —", archivesSalaire:"Months archive", sauvegarderSalaire:"💾 Save this month",
+    enregistre:"✅ Saved"
   }
 };
 function t(key){ return (T[state.lang] && T[state.lang][key]) || (T.fr[key]) || key; }
@@ -230,6 +240,12 @@ function monthLabel(key){
   return s.charAt(0).toUpperCase()+s.slice(1);
 }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
+function addMonths(iso,n){ if(!iso) return ""; const d=new Date(iso); d.setMonth(d.getMonth()+Number(n||0)); return d.toISOString().slice(0,10); }
+function monthOffsetFromKey(key){
+  const [y,m]=key.split("-").map(Number);
+  const now=new Date();
+  return (y-now.getFullYear())*12 + (m-1-now.getMonth());
+}
 
 const emptyPlanner = ()=>({
   dateDebut:todayISO(),
@@ -237,7 +253,8 @@ const emptyPlanner = ()=>({
   objectif:{nom:"",montant:"",dateLimite:""},
   cotisations:[],
   ventes:{},                                     // { "2026-08-27": { objets:[{id,nom,prix,qte}] } }
-  tontine:{nom:"",valeurMax:"",fraisRetraitPct:"",membres:[]}
+  tontine:{nom:"",valeurMax:"",fraisRetraitPct:"",dateDebut:"",dureeMois:"",membres:[],suivi:{}}
+  // tontine.suivi : { "2026-08": { ramasseurId, montantCollecte } }
 });
 function emptyMoisFinance(){ return { salaire:"", depenses:[] }; }
 function emptyJourVente(){ return { objets:[] }; }
@@ -251,6 +268,9 @@ function migratePlanner(data){
     out.finance[key] = { salaire: data.salaire||"", depenses: data.depenses||[] };
   }
   if(!out.ventes) out.ventes = {};
+  if(!out.tontine.suivi) out.tontine.suivi = {};
+  if(out.tontine.dateDebut===undefined) out.tontine.dateDebut = "";
+  if(out.tontine.dureeMois===undefined) out.tontine.dureeMois = "";
   delete out.salaire; delete out.depenses;
   return out;
 }
@@ -284,7 +304,7 @@ let state = {
   codeInput:"", loginError:"", currentClient:null, registry:[], plannerData:null,
   signupSuccess:false, _sgNom:"", _sgEmail:"", _sgWhatsapp:"",
   registrations:[],
-  tab:"salaire", financeMonthOffset:0, venteDate:todayISO()
+  tab:"salaire", financeMonthOffset:0, tontineMonthOffset:0, venteDate:todayISO()
 };
 const app = document.getElementById("app");
 
@@ -482,6 +502,9 @@ function renderTabSalaire(){
   const totalDepenses = mois.depenses.reduce((s,x)=>s+(Number(x.montant)||0),0);
   const resteDisponible = (Number(mois.salaire)||0) - totalDepenses;
   const isCurrent = state.financeMonthOffset===0;
+  const archiveMonthKeys = Object.keys(d.finance)
+    .filter(k=> (d.finance[k].salaire || (d.finance[k].depenses&&d.finance[k].depenses.length)))
+    .sort((a,b)=> b<a?-1:1);
 
   return `
   <div class="card">
@@ -502,10 +525,24 @@ function renderTabSalaire(){
       <button id="addDepBtn" class="btn-icon btn">➕</button>
     </div>
     <div class="divider"></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <span style="font-size:13px;color:var(--text-muted);">${t("resteDispo")}</span>
       <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:${resteDisponible>=0?'var(--green)':'var(--red)'};">${formatFCFA(resteDisponible)}</span>
     </div>
+    <button id="saveSalaireBtn" class="btn-primary btn" style="width:100%;justify-content:center;">${state._salaireSaved?t("enregistre"):t("sauvegarderSalaire")}</button>
+  </div>
+
+  <div class="card">
+    <div class="card-header">📦 ${t("archivesSalaire")}</div>
+    ${archiveMonthKeys.length===0?`<div class="empty-hint">${t("aucuneDepense")}</div>`:
+      archiveMonthKeys.map(k=>{
+        const m=d.finance[k];
+        const tot=(m.depenses||[]).reduce((s,x)=>s+(Number(x.montant)||0),0);
+        return `<div class="archive-item loadFinanceMonth" data-key="${k}">
+          <span class="archive-item-label">${monthLabel(k)}${k===key?" •":""}</span>
+          <span class="list-row-value">${formatFCFA((Number(m.salaire)||0)-tot)}</span>
+        </div>`;
+      }).join("")}
   </div>`;
 }
 
@@ -621,6 +658,14 @@ function renderTabTontine(){
   const valeurMaxT = Number(d.tontine.valeurMax)||0;
   const totalTontine = d.tontine.membres.reduce((s,m)=>s+m.depots.reduce((s2,x)=>s2+(Number(x.montant)||0),0),0);
   const progT = valeurMaxT>0 ? Math.min((totalTontine/valeurMaxT)*100,100) : 0;
+  const dateFinTontine = (d.tontine.dateDebut && d.tontine.dureeMois) ? addMonths(d.tontine.dateDebut, d.tontine.dureeMois) : "";
+
+  // --- suivi des ramassages mensuels ---
+  const key = monthKeyFromOffset(state.tontineMonthOffset);
+  const isCurrentT = state.tontineMonthOffset===0;
+  const suivi = d.tontine.suivi[key] || { ramasseurId:"", montantCollecte:"" };
+  const totalMois = d.tontine.membres.reduce((s,m)=>s+m.depots.filter(dp=>(dp.date||"").slice(0,7)===key).reduce((s2,x)=>s2+(Number(x.montant)||0),0),0);
+  const archiveMoisKeys = Object.keys(d.tontine.suivi).filter(k=>d.tontine.suivi[k].ramasseurId||d.tontine.suivi[k].montantCollecte).sort((a,b)=>b<a?-1:1);
 
   return `
   <div class="card">
@@ -630,6 +675,14 @@ function renderTabTontine(){
       <div><label class="field-label">${t("valeurMax")}</label><input id="tontMax" class="input" type="number" placeholder="Ex: 1000000" value="${esc(d.tontine.valeurMax)}"/></div>
       <div><label class="field-label">${t("fraisRetrait")}</label><input id="tontFrais" class="input" type="number" placeholder="Ex: 2" value="${esc(d.tontine.fraisRetraitPct)}"/></div>
     </div>
+    <div class="grid-2" style="margin-top:14px;">
+      <div><label class="field-label">${t("tontineDateDebut")}</label><input id="tontDateDebut" class="input" type="date" value="${d.tontine.dateDebut}"/></div>
+      <div><label class="field-label">${t("tontineDuree")}</label><input id="tontDuree" class="input" type="number" placeholder="Ex: 12" value="${esc(d.tontine.dureeMois)}"/></div>
+    </div>
+    ${dateFinTontine?`
+    <div class="recommend-box"><div>🏁</div><div>
+      <div class="recommend-value">${t("tontineDateFin")} : ${formatDateCourte(dateFinTontine)}</div>
+    </div></div>`:""}
     ${valeurMaxT>0?`
     <div style="margin-top:18px;">
       <div class="progress-track-dark"><div class="progress-fill-green" style="width:${progT}%;"></div></div>
@@ -662,6 +715,37 @@ function renderTabTontine(){
             <input class="input depotInput" data-membre="${m.id}" type="number" placeholder="${t("montantDepot")}" style="flex:1;"/>
             <button class="btn-icon btn addDepotBtn" data-membre="${m.id}">➕</button>
           </div>
+        </div>`;
+      }).join("")}
+  </div>
+
+  <div class="card">
+    <div class="card-header">${t("ramassageHeader")}</div>
+    <div class="month-nav">
+      <button class="month-nav-btn btn" id="tontMonthPrevBtn">◀</button>
+      <div class="month-nav-label">${monthLabel(key)}<span class="month-nav-tag">${isCurrentT?"· "+t("enCours"):"· "+t("archive")}</span></div>
+      <button class="month-nav-btn btn" id="tontMonthNextBtn" ${isCurrentT?"disabled":""}>▶</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">${t("collecte")} (${monthLabel(key)}) : <strong style="color:var(--text);">${formatFCFA(totalMois)}</strong></div>
+    <label class="field-label">${t("quiRamasse")}</label>
+    <select id="tontRamasseur" class="input">
+      <option value="">${t("choisirMembre")}</option>
+      ${d.tontine.membres.map(m=>`<option value="${m.id}" ${suivi.ramasseurId===m.id?"selected":""}>${esc(m.nom)}</option>`).join("")}
+    </select>
+    <label class="field-label" style="margin-top:14px;">${t("montantCollecte")}</label>
+    <input id="tontMontantCollecte" class="input" type="number" value="${suivi.montantCollecte!==""&&suivi.montantCollecte!==undefined?esc(suivi.montantCollecte):esc(totalMois||"")}"/>
+    <button id="saveTontineMoisBtn" class="btn-primary btn" style="width:100%;justify-content:center;margin-top:14px;">${state._tontineSaved?t("enregistre"):t("sauvegarderMois")}</button>
+  </div>
+
+  <div class="card">
+    <div class="card-header">📦 ${t("archivesTontine")}</div>
+    ${archiveMoisKeys.length===0?`<div class="empty-hint">${t("aucunRamassage")}</div>`:
+      archiveMoisKeys.map(k=>{
+        const s=d.tontine.suivi[k];
+        const membre = d.tontine.membres.find(m=>m.id===s.ramasseurId);
+        return `<div class="archive-item loadTontineMonth" data-key="${k}">
+          <span class="archive-item-label">${monthLabel(k)}${k===key?" •":""} — ${membre?esc(membre.nom):"—"}</span>
+          <span class="list-row-value">${formatFCFA(s.montantCollecte)}</span>
         </div>`;
       }).join("")}
   </div>`;
@@ -706,6 +790,8 @@ function attachEvents(){
       document.getElementById("monthNextBtn")?.addEventListener("click",()=>{ if(state.financeMonthOffset<0){ state.financeMonthOffset++; render(); } });
       document.getElementById("addDepBtn")?.addEventListener("click",addDepense);
       document.querySelectorAll(".delDepense").forEach(b=>b.addEventListener("click",()=>removeDepense(b.dataset.id)));
+      document.getElementById("saveSalaireBtn")?.addEventListener("click",async()=>{ await persistPlanner(false); state._salaireSaved=true; render(); setTimeout(()=>{ state._salaireSaved=false; },1500); });
+      document.querySelectorAll(".loadFinanceMonth").forEach(b=>b.addEventListener("click",()=>{ state.financeMonthOffset=monthOffsetFromKey(b.dataset.key); render(); }));
     }
     if(state.tab==="objectif"){
       bindDebounced("objNom", v=>state.plannerData.objectif.nom=v);
@@ -725,10 +811,23 @@ function attachEvents(){
       bindDebounced("tontNom", v=>state.plannerData.tontine.nom=v);
       bindDebounced("tontMax", v=>state.plannerData.tontine.valeurMax=v);
       bindDebounced("tontFrais", v=>state.plannerData.tontine.fraisRetraitPct=v);
+      bindDebounced("tontDateDebut", v=>state.plannerData.tontine.dateDebut=v);
+      bindDebounced("tontDuree", v=>state.plannerData.tontine.dureeMois=v);
       document.getElementById("addMembreBtn")?.addEventListener("click",addMembre);
       document.querySelectorAll(".delMembre").forEach(b=>b.addEventListener("click",()=>removeMembre(b.dataset.id)));
       document.querySelectorAll(".addDepotBtn").forEach(b=>b.addEventListener("click",()=>addDepot(b.dataset.membre)));
       document.querySelectorAll(".delDepot").forEach(b=>b.addEventListener("click",()=>removeDepot(b.dataset.membre,b.dataset.depot)));
+      document.getElementById("tontMonthPrevBtn")?.addEventListener("click",()=>{ state.tontineMonthOffset--; render(); });
+      document.getElementById("tontMonthNextBtn")?.addEventListener("click",()=>{ if(state.tontineMonthOffset<0){ state.tontineMonthOffset++; render(); } });
+      document.getElementById("saveTontineMoisBtn")?.addEventListener("click",async()=>{
+        const key=monthKeyFromOffset(state.tontineMonthOffset);
+        const ramasseurId=document.getElementById("tontRamasseur").value;
+        const montantCollecte=document.getElementById("tontMontantCollecte").value;
+        state.plannerData.tontine.suivi[key]={ ramasseurId, montantCollecte };
+        await persistPlanner(false);
+        state._tontineSaved=true; render(); setTimeout(()=>{ state._tontineSaved=false; },1500);
+      });
+      document.querySelectorAll(".loadTontineMonth").forEach(b=>b.addEventListener("click",()=>{ state.tontineMonthOffset=monthOffsetFromKey(b.dataset.key); render(); }));
     }
   }
 }
@@ -760,14 +859,14 @@ async function doLogin(){
   if(joursRestants(client.dateExpiration)<0){ state.loginError = state.lang==="en" ? "Your subscription has expired. Renew it to continue." : "Ton abonnement a expiré. Renouvelle-le pour continuer."; render(); return; }
   state.currentClient=client;
   state.plannerData = await getPlannerData(client.code);
-  state.tab="salaire"; state.financeMonthOffset=0; state.venteDate=todayISO();
+  state.tab="salaire"; state.financeMonthOffset=0; state.tontineMonthOffset=0; state.venteDate=todayISO();
   state.view="app"; render();
 }
 function doLogout(){
   state={ lang:state.lang, view:"home", homeMode:"login", codeInput:"", loginError:"",
     currentClient:null, registry:[], plannerData:null, signupSuccess:false,
     _sgNom:"", _sgEmail:"", _sgWhatsapp:"", registrations:[],
-    tab:"salaire", financeMonthOffset:0, venteDate:todayISO() };
+    tab:"salaire", financeMonthOffset:0, tontineMonthOffset:0, venteDate:todayISO() };
   render();
 }
 
@@ -897,4 +996,3 @@ render();
 </script>
 </body>
 </html>
-'mis
